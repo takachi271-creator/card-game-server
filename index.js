@@ -25,6 +25,7 @@ app.get("/join/:name", (req, res) => {
     game.players[name] = 100;
   }
 
+ //この下にbetが来る
   app.get("/bet/:name/:amount", (req, res) => {
   const name = req.params.name;
   const amount = parseInt(req.params.amount);
