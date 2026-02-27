@@ -25,6 +25,18 @@ app.get("/join/:name", (req, res) => {
     game.players[name] = 100;
   }
 
+  app.get("/bet/:name/:amount", (req, res) => {
+  const name = req.params.name;
+  const amount = parseInt(req.params.amount);
+
+  if (!game.players[name]) return res.send("未参加");
+  if (amount < game.minBet) return res.send("最低賭け金不足");
+  if (amount > game.players[name]) return res.send("所持金不足");
+
+  game.bets[name] = amount;
+
+  res.json({ bets: game.bets });
+});
   res.json({ players: game.players });
 });
 // プレイヤー参加
