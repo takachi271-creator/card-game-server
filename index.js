@@ -17,6 +17,16 @@ app.get("/", (req, res) => {
   res.send("ゲーム稼働開始");
 });
 
+// 追加
+app.get("/join/:name", (req, res) => {
+  const name = req.params.name;
+
+  if (!game.players[name]) {
+    game.players[name] = 100;
+  }
+
+  res.json({ players: game.players });
+});
 // プレイヤー参加
 app.post("/join", (req, res) => {
   const { name } = req.body;
