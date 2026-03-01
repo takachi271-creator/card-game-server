@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Card Game</title>
+  <style>
+    body { font-family: Arial; text-align:center; background:#111; color:white; }
+    button { padding:10px 20px; margin:5px; font-size:16px; }
+    input { padding:8px; font-size:16px; }
+    .box { margin:20px; }
+  </style>
+</head>
+<body>
+
+<h1>Card Game</h1>
+
+<div class="box">
+  <input id="name" placeholder="名前">
+  <button onclick="join()">参加</button>
+</div>
+
+<div class="box">
+  <input id="betAmount" placeholder="賭け金" type="number">
+  <button onclick="bet()">ベット</button>
+</div>
+
+<div class="box">
+  <input id="winnerName" placeholder="勝者名">
+  <button onclick="winner()">勝者決定</button>
+</div>
+
+<div class="box">
+  <button onclick="loadState()">状態更新</button>
+</div>
+
+<pre id="output"></pre>
+
+<script>
+const base = "";
+
+function join(){
+  const name = document.getElementById("name").value;
+  fetch(/join/${name})
+    .then(r=>r.json())
+    .then(d=>output(d));
+}
+
+function bet(){
+  const name = document.getElementById("name").value;
+  const amount = document.getElementById("betAmount").value;
+  fetch(/bet/${name}/${amount})
+    .then(r=>r.json())
+    .then(d=>output(d));
+}
+
+function winner(){
+  const name = document.getElementById("winnerName").value;
+  fetch(/winner/${name})
+    .then(r=>r.json())
+    .then(d=>output(d));
+}
+
+function loadState(){
+  fetch(/state)
+    .then(r=>r.json())
+    .then(d=>output(d));
+}
+
+function output(data){
+  document.getElementById("output").textContent =
+    JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
