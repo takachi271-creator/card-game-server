@@ -40,6 +40,31 @@ app.get("/join/:name", (req, res) => {
 });
   res.json({ players: game.players });
 });
+
+//勝者処理
+app.get("/winner/:name", (req, res) => {
+  const name = req.params.name;
+
+  if (!game.bets[name]) return res.send("その人は賭けてない");
+
+  for (let player in game.bets) {
+    if (player === name) {
+      game.players[player] += game.bets[player] * game.multiplier;
+    } else {
+      game.players[player] -= game.bets[player];
+    }
+  }
+
+  game.bets = {};
+  game.round++;
+
+  res.json({
+    winner: name,
+    players: game.players,
+    round: game.round
+  });
+});
+
 // プレイヤー参加
 app.post("/join", (req, res) => {
   const { name } = req.body;
