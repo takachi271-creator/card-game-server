@@ -1,7 +1,7 @@
 const express = require("express");
-app.use(express.static("public"));
 const app = express();
 app.use(express.json());
+app.use(express.static("public"));
 
 let game = {
   players: {},
