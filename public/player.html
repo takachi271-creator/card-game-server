@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Player</title>
+</head>
+<body>
+<h2>プレイヤー</h2>
+
+<input id="name" placeholder="名前">
+<button onclick="join()">参加</button>
+
+<br><br>
+
+<input id="betAmount" type="number" placeholder="賭け金">
+<button onclick="bet()">ベット</button>
+
+<br><br>
+
+<button onclick="loadState()">状態更新</button>
+
+<pre id="output"></pre>
+
+<script>
+function join(){
+  const name = document.getElementById("name").value;
+  fetch(`/join/${name}`).then(r=>r.json()).then(show);
+}
+
+function bet(){
+  const name = document.getElementById("name").value;
+  const amount = document.getElementById("betAmount").value;
+  fetch(`/bet/${name}/${amount}`).then(r=>r.json()).then(show);
+}
+
+function loadState(){
+  fetch(`/state`).then(r=>r.json()).then(show);
+}
+
+function show(data){
+  document.getElementById("output").textContent =
+  JSON.stringify(data,null,2);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Host</title>
+</head>
+<body>
+<h2>ホスト画面</h2>
+
+<input id="winnerName" placeholder="勝者名">
+<button onclick="winner()">勝者決定</button>
+
+<br><br>
+
+<button onclick="loadState()">状態更新</button>
+
+<pre id="output"></pre>
+
+<script>
+function winner(){
+  const name = document.getElementById("winnerName").value;
+  fetch(`/winner/${name}`).then(r=>r.json()).then(show);
+}
+
+function loadState(){
+  fetch(`/state`).then(r=>r.json()).then(show);
+}
+
+function show(data){
+  document.getElementById("output").textContent =
+  JSON.stringify(data,null,2);
+}
+</script>
+</body>
+</html>
