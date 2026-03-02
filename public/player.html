@@ -4,25 +4,22 @@
 <meta charset="UTF-8">
 <title>Player</title>
 </head>
+
 <body>
 
-<h1 style="color:red;">テスト</h1>
+<h2>プレイヤー画面</h2>
 
-<!-- 🟣 ロビー -->
+<!-- ===== ロビー ===== -->
 <div id="lobby">
-  <h2>ロビー</h2>
+  <h3>ロビー</h3>
   <input id="playerName" placeholder="名前を入力">
   <button onclick="joinGame()">参加する</button>
 </div>
 
-<!-- 🟢 ゲーム画面 -->
+<!-- ===== ゲーム画面 ===== -->
 <div id="game" style="display:none;">
 
-  <h2>ゲーム</h2>
-
   <p>プレイヤー: <span id="displayName"></span></p>
-
-  <p>現在のベット: <span id="currentBet">0</span></p>
 
   <input id="betAmount" type="number" placeholder="賭け金">
   <button onclick="bet()">ベット</button>
@@ -39,60 +36,25 @@
 
 let currentName = "";
 
-function joinGame() {
-  const name = document.getElementById("playerName").value;
-  if (!name) return alert("名前を入力して");
-
-  currentName = name;
-
-  fetch(`/join/${name}`)
-    .then(r => r.json())
-    .then(show);
-
-  document.getElementById("displayName").textContent = name;
-  document.getElementById("lobby").style.display = "none";
-  document.getElementById("game").style.display = "block";
-}
-
-function bet(){
-  const amount = document.getElementById("betAmount").value;
-  fetch(`/bet/${currentName}/${amount}`)
-    .then(r=>r.json())
-    .then(show);
-}
-
-function loadState(){
-  fetch(`/state`)
-    .then(r=>r.json())
-    .then(show);
-}
-
-function show(data){
-  document.getElementById("output").textContent =
-    JSON.stringify(data,null,2);
-
-  if (data.bets && data.bets[currentName]) {
-    document.getElementById("currentBet").textContent =
-      data.bets[currentName];
-  }
-}
-
-</script>
-let currentName = "";
-
-// 参加
+// =====================
+// 参加（POST /join）
+// =====================
 function joinGame() {
   const name = document.getElementById("playerName").value;
   if (!name) return alert("名前を入力して");
 
   fetch("/join", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({ name })
   })
   .then(res => res.json())
   .then(data => {
     currentName = name;
+
+    document.getElementById("displayName").textContent = name;
 
     document.getElementById("lobby").style.display = "none";
     document.getElementById("game").style.display = "block";
@@ -101,14 +63,25 @@ function joinGame() {
   });
 }
 
-// ベット
+
+// =====================
+// ベット（POST /bet）
+// =====================
 function bet() {
-  const amount = parseInt(document.getElementById("betAmount").value);
+
+  const amount = parseInt(
+    document.getElementById("betAmount").value
+  );
 
   fetch("/bet", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: currentName, amount })
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: currentName,
+      amount: amount
+    })
   })
   .then(res => res.json())
   .then(data => {
@@ -116,15 +89,19 @@ function bet() {
   });
 }
 
-// 状態取得
+
+// =====================
+// 状態取得（GET /state）
+// =====================
 function loadState() {
   fetch("/state")
-  .then(res => res.json())
-  .then(data => {
-    document.getElementById("output").textContent =
-      JSON.stringify(data, null, 2);
-  });
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("output").textContent =
+        JSON.stringify(data, null, 2);
+    });
 }
+
 </script>
 
 </body>
