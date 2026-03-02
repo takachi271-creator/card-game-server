@@ -15,9 +15,23 @@ let game = {
 
   round:1,
   startMoney:100,
-  minBet:5,
-  interestRate:0.05
+  minBet:5
 };
+
+// =====================
+// 信用 → 通知成功率
+// =====================
+function getTrustChance(trust){
+
+  if(trust >= 100) return 1.0;
+  if(trust >= 80) return 0.8;
+  if(trust >= 70) return 0.7;
+  if(trust >= 50) return 0.5;
+  if(trust >= 30) return 0.3;
+  if(trust >= 10) return 0.1;
+  if(trust >= 1)  return 0.05;
+  return 0;
+}
 
 // =====================
 // 参加
@@ -36,7 +50,7 @@ app.post("/join",(req,res)=>{
 });
 
 // =====================
-// BET（増額のみ）
+// BET（減額不可）
 // =====================
 app.post("/bet",(req,res)=>{
 
@@ -62,7 +76,7 @@ app.post("/bet",(req,res)=>{
 });
 
 // =====================
-// 借金申請（信用依存）
+// 借金申請（信用確率）
 // =====================
 app.post("/loan/request",(req,res)=>{
 
@@ -74,8 +88,7 @@ app.post("/loan/request",(req,res)=>{
   if(!others.length)
     return res.send("貸し手なし");
 
-  const trust = game.trust[name] || 80;
-  const chance = Math.max(0.1, trust/100);
+  const chance = getTrustChance(game.trust[name]);
 
   if(Math.random() > chance){
     return res.json({failed:true});
@@ -155,20 +168,16 @@ app.post("/trust/exchange",(req,res)=>{
     return res.send("このターンはもう交換できません");
   }
 
-  if(!game.trust[name] || game.trust[name] < 30){
+  if(game.trust[name] < 30){
     return res.send("信用不足");
   }
 
   const gain = Math.floor(game.startMoney * 0.3);
 
-  game.trust[name] -= 30;
-  game.players[name] += gain;
+  game.trust[name]-=30;
+  game.players[name]+=gain;
 
-  res.json({
-    gained:gain,
-    money:game.players[name],
-    trust:game.trust[name]
-  });
+  res.json(game);
 });
 
 // =====================
@@ -178,30 +187,16 @@ app.post("/winner",(req,res)=>{
 
   const {name}=req.body;
 
-  let totalPot=0;
+  let pot=0;
 
   for(let p in game.bets){
-    totalPot+=game.bets[p];
+    pot+=game.bets[p];
     game.players[p]-=game.bets[p];
   }
 
-  const winnerBet=game.bets[name];
-  const percent=(winnerBet/game.startMoney)*100;
+  game.players[name]+=pot;
 
-  let multiplier=1.2;
-  if(percent>=500) multiplier=5;
-  else if(percent>=200) multiplier=3;
-  else if(percent>=150) multiplier=2;
-  else if(percent>=100) multiplier=1.9;
-  else if(percent>=75) multiplier=1.8;
-  else if(percent>=50) multiplier=1.5;
-  else if(percent>=20) multiplier=1.4;
-
-  const reward=Math.floor(totalPot*multiplier);
-
-  game.players[name]+=reward;
-
-  // ===== 借金未返済ペナルティ =====
+  // 未返済ペナルティ
   for(let borrower in game.loans){
 
     const loan=game.loans[borrower];
@@ -212,7 +207,7 @@ app.post("/winner",(req,res)=>{
     }
   }
 
-  // ===== 借金してない人の信用回復 =====
+  // 借金なし5ターン回復
   for(let player in game.players){
 
     if(!game.loans[player]){
@@ -229,13 +224,7 @@ app.post("/winner",(req,res)=>{
   game.bets={};
   game.round++;
 
-  res.json({
-    winner:name,
-    reward,
-    players:game.players,
-    trust:game.trust,
-    round:game.round
-  });
+  res.json(game);
 });
 
 // =====================
