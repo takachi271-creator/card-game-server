@@ -12,19 +12,21 @@ body{
   color:white;
 }
 
-h2{
-  text-align:center;
-  margin:12px 0;
+/* ⭐ 横長防止（スマホ最適） */
+.container{
+  max-width:420px;
+  margin:auto;
+  padding:12px;
 }
 
-.container{
-  padding:12px;
+h2{
+  text-align:center;
 }
 
 .card{
   background:#1c1c1c;
   border-radius:12px;
-  padding:12px;
+  padding:14px;
   margin-bottom:12px;
 }
 
@@ -81,6 +83,8 @@ input{
 <div class="card">
 <input id="betAmount" type="number" placeholder="賭け金">
 <button onclick="bet()">ベット</button>
+
+<p>⭐ 倍率: <span id="previewMultiplier">1.2</span>x</p>
 </div>
 
 <div class="card">
@@ -115,18 +119,15 @@ function joinGame(){
   body:JSON.stringify({name})
  })
  .then(()=>{
-
   currentName=name;
-
   document.getElementById("lobby").style.display="none";
   document.getElementById("game").style.display="block";
-
   loadState();
  });
 }
 
 
-// ===== BET（減額禁止対応）=====
+// ===== BET =====
 function bet(){
 
  const amount=parseInt(
@@ -139,35 +140,54 @@ function bet(){
  })
  .then(res=>res.text())
  .then(data=>{
-
    if(data.includes("ベット")){
      alert(data);
      return;
    }
-
    loadState();
  });
 }
 
 
+// ===== 倍率プレビュー復活 =====
+function calculateMultiplier(amount){
+
+  if(amount>=500) return 5.0;
+  if(amount>=200) return 3.0;
+  if(amount>=150) return 2.0;
+  if(amount>=100) return 1.9;
+  if(amount>=75) return 1.8;
+  if(amount>=50) return 1.5;
+  if(amount>=20) return 1.4;
+
+  return 1.2;
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+  document.getElementById("betAmount")
+  .addEventListener("input",()=>{
+
+    const amount=parseInt(
+      document.getElementById("betAmount").value)||0;
+
+    document.getElementById("previewMultiplier")
+      .textContent=calculateMultiplier(amount);
+  });
+
+});
+
+
 // ===== 借金 =====
 function requestLoan(){
 
- const input=document.getElementById("loanAmount");
- const amount=parseInt(input.value);
-
- if(!amount){
-   alert("金額入力");
-   return;
- }
+ const amount=parseInt(
+   document.getElementById("loanAmount").value);
 
  fetch("/loan/request",{
   method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({
-    name:currentName,
-    amount:amount
-  })
+  body:JSON.stringify({name:currentName,amount})
  })
  .then(res=>res.json())
  .then(data=>{
@@ -188,14 +208,10 @@ function loadState(){
   document.getElementById("money").textContent=Math.floor(money);
   document.getElementById("round").textContent=data.round;
 
-  // POT
   let pot=0;
-  for(let p in data.bets){
-    pot+=data.bets[p];
-  }
+  for(let p in data.bets){ pot+=data.bets[p]; }
   document.getElementById("pot").textContent=pot;
 
-  // 前回結果
   if(lastMoney!==null && data.round!==lastRound){
 
     const diff=Math.floor(money-lastMoney);
@@ -216,7 +232,6 @@ function loadState(){
   lastMoney=money;
   lastRound=data.round;
 
-  // プレイヤー一覧
   const list=document.getElementById("playerList");
   list.innerHTML="";
 
@@ -225,16 +240,11 @@ function loadState(){
     const div=document.createElement("div");
 
     let text=p;
+    if(data.bets[p]) text+=" : BET "+data.bets[p];
+    else text+=" : 待機中";
 
-    if(data.bets[p]){
-      text+=" : BET "+data.bets[p];
-    }else{
-      text+=" : 待機中";
-    }
-
-    if(p===currentName){
+    if(p===currentName)
       div.style.border="2px solid #2ecc71";
-    }
 
     div.textContent=text;
     list.appendChild(div);
