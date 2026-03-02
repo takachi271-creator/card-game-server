@@ -78,6 +78,54 @@ function show(data){
 }
 
 </script>
+let currentName = "";
+
+// 参加
+function joinGame() {
+  const name = document.getElementById("playerName").value;
+  if (!name) return alert("名前を入力して");
+
+  fetch("/join", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name })
+  })
+  .then(res => res.json())
+  .then(data => {
+    currentName = name;
+
+    document.getElementById("lobby").style.display = "none";
+    document.getElementById("game").style.display = "block";
+
+    loadState();
+  });
+}
+
+// ベット
+function bet() {
+  const amount = parseInt(document.getElementById("betAmount").value);
+
+  fetch("/bet", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: currentName, amount })
+  })
+  .then(res => res.json())
+  .then(data => {
+    loadState();
+  });
+}
+
+// 状態取得
+function loadState() {
+  fetch("/state")
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("output").textContent =
+      JSON.stringify(data, null, 2);
+  });
+}
+</script>
 
 </body>
 </html>
