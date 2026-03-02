@@ -16,7 +16,7 @@
   <button onclick="joinGame()">参加する</button>
 </div>
 
-<!-- ===== ホーム / ゲーム画面 ===== -->
+<!-- ===== ゲーム画面 ===== -->
 <div id="game" style="display:none;">
 
   <p>プレイヤー: <span id="displayName"></span></p>
@@ -28,7 +28,12 @@
   <input id="betAmount" type="number" placeholder="賭け金">
   <button onclick="bet()">ベット</button>
 
-  <br><br>
+  <hr>
+
+  <h3>参加中プレイヤー</h3>
+  <div id="playerList"></div>
+
+  <br>
 
   <button onclick="loadState()">状態更新</button>
 
@@ -59,7 +64,6 @@ function joinGame() {
     currentName = name;
 
     document.getElementById("displayName").textContent = name;
-
     document.getElementById("lobby").style.display = "none";
     document.getElementById("game").style.display = "block";
 
@@ -88,9 +92,7 @@ function bet() {
     })
   })
   .then(res => res.json())
-  .then(() => {
-    loadState();
-  });
+  .then(() => loadState());
 }
 
 
@@ -106,19 +108,41 @@ function loadState() {
       document.getElementById("output").textContent =
         JSON.stringify(data, null, 2);
 
-      // 所持金表示
+      // 所持金
       if (data.players[currentName] !== undefined) {
         document.getElementById("money").textContent =
           Math.floor(data.players[currentName]);
       }
 
-      // ラウンド表示
+      // ラウンド
       document.getElementById("round").textContent =
         data.round;
+
+      // ⭐ プレイヤー一覧
+      const list = document.getElementById("playerList");
+      list.innerHTML = "";
+
+      for (let name in data.players) {
+
+        const div = document.createElement("div");
+
+        if (data.bets[name]) {
+          div.textContent = name + " : BET " + data.bets[name];
+        } else {
+          div.textContent = name + " : 待機中";
+        }
+
+        // 自分だけ少し強調
+        if (name === currentName) {
+          div.style.fontWeight = "bold";
+        }
+
+        list.appendChild(div);
+      }
     });
 }
 
-// ⭐ 自動更新（超重要）
+// ⭐ 自動更新
 setInterval(loadState, 2000);
 
 </script>
