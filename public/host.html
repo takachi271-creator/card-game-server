@@ -1,3 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Host</title>
+</head>
+
+<body>
+
+<h2>ホスト画面</h2>
+
+<button onclick="loadState()">状態更新</button>
+
+<h3>プレイヤー一覧</h3>
+<div id="players"></div>
+
+<hr>
+
+<h3>勝者選択（ベットした人のみ）</h3>
+<select id="winnerSelect"></select>
+<button onclick="decideWinner()">勝者決定</button>
+
+<pre id="output"></pre>
+
 <script>
 
 function loadState() {
@@ -14,20 +38,18 @@ function loadState() {
       playersDiv.innerHTML = "";
       winnerSelect.innerHTML = "";
 
-      // ===== 全プレイヤー表示 =====
       for (let name in data.players) {
         const p = document.createElement("p");
         p.textContent =
-          `${name} : ${Math.floor(data.players[name])}`;
+          name + " : " + Math.floor(data.players[name]);
         playersDiv.appendChild(p);
       }
 
-      // ===== ⭐ ベットした人だけ勝者候補 =====
       for (let name in data.bets) {
         const option = document.createElement("option");
         option.value = name;
         option.textContent =
-          `${name} (BET ${data.bets[name]})`;
+          name + " (BET " + data.bets[name] + ")";
         winnerSelect.appendChild(option);
       }
     });
@@ -39,10 +61,8 @@ function decideWinner() {
 
   fetch("/winner", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ name })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name })
   })
   .then(res => res.json())
   .then(() => loadState());
@@ -51,3 +71,6 @@ function decideWinner() {
 setInterval(loadState, 2000);
 
 </script>
+
+</body>
+</html>
