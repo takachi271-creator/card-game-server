@@ -5,10 +5,18 @@
 <title>Player</title>
 </head>
 <body>
-<h2>プレイヤー</h2>
 
-<input id="name" placeholder="名前">
-<button onclick="join()">参加</button>
+  <!--  ロビー -->
+  <div id="lobby">
+    <h2>ロビー</h2>
+    <input id="playerName" placeholder="名前を入力">
+    <button onclick="joinGame()">参加する</button>
+  </div>
+
+  <!--  ゲーム画面 -->
+  <div id="game" style="display:none;">
+  </div>
+</body>
 
 <br><br>
 
@@ -40,6 +48,13 @@ function loadState(){
 function show(data){
   document.getElementById("output").textContent =
   JSON.stringify(data,null,2);
+}
+function joinGame() {
+  const name = document.getElementById("playerName").value;
+  if (!name) return alert("名前を入力して");
+
+  document.getElementById("lobby").style.display = "none";
+  document.getElementById("game").style.display = "block";
 }
 </script>
 </body>
