@@ -7,15 +7,15 @@ app.use(express.static("public"));
 let game = {
   players: {},
   bets: {},
-  loans: {},        // { borrower:{ lender, amount } }
-  loanRequests: {}, // 申請中
+  loans: {},        // 借金 { borrower:{ lender, amount } }
+  loanRequests: {}, // { lender:{ borrower, amount } }
   round: 1,
   multiplier: 1.2,
   minBet: 5
 };
 
 // ===== 参加 =====
-app.post("/join", (req,res)=>{
+app.post("/join",(req,res)=>{
   const {name}=req.body;
 
   if(!game.players[name]){
@@ -26,29 +26,39 @@ app.post("/join", (req,res)=>{
 });
 
 
-// ===== ベット =====
+// ===== ベット（借金考慮）=====
 app.post("/bet",(req,res)=>{
   const {name,amount}=req.body;
+
+  if(!game.players[name])
+    return res.send("未参加");
+
+  let debt = game.loans[name]?.amount || 0;
+  const maxBet = game.players[name] + debt;
+
+  if(amount > maxBet)
+    return res.send("賭けすぎ");
+
+  if(amount < game.minBet)
+    return res.send("最低賭け金不足");
 
   game.bets[name]=amount;
   res.json(game);
 });
 
 
-// =====================
-// ⭐ 借金申請
-// =====================
+// ===== 借金申請 =====
 app.post("/loan/request",(req,res)=>{
 
-  const {name, amount}=req.body;
+  const {name,amount}=req.body;
 
-  const others = Object.keys(game.players)
+  const others =
+    Object.keys(game.players)
     .filter(p=>p!==name);
 
   if(others.length===0)
-    return res.send("貸す人がいない");
+    return res.send("貸す人なし");
 
-  // ランダム選出
   const lender =
     others[Math.floor(Math.random()*others.length)];
 
@@ -57,16 +67,11 @@ app.post("/loan/request",(req,res)=>{
     amount:amount
   };
 
-  res.json({
-    lender:lender,
-    amount:amount
-  });
+  res.json({ lender, amount });
 });
 
 
-// =====================
-// ⭐ 承認
-// =====================
+// ===== 承認 =====
 app.post("/loan/accept",(req,res)=>{
 
   const {name}=req.body;
@@ -90,12 +95,9 @@ app.post("/loan/accept",(req,res)=>{
 });
 
 
-// =====================
-// ⭐ 拒否
-// =====================
+// ===== 拒否 =====
 app.post("/loan/reject",(req,res)=>{
   const {name}=req.body;
-
   delete game.loanRequests[name];
   res.json(game);
 });
@@ -103,6 +105,7 @@ app.post("/loan/reject",(req,res)=>{
 
 // ===== 勝者 =====
 app.post("/winner",(req,res)=>{
+
   const {name}=req.body;
 
   for(let p in game.bets){
