@@ -4,32 +4,84 @@
 <meta charset="UTF-8">
 <title>Host</title>
 </head>
+
 <body>
+
 <h2>ホスト画面</h2>
 
-<input id="winnerName" placeholder="勝者名">
-<button onclick="winner()">勝者決定</button>
-
-<br><br>
-
 <button onclick="loadState()">状態更新</button>
+
+<h3>プレイヤー一覧</h3>
+<div id="players"></div>
+
+<hr>
+
+<h3>勝者選択</h3>
+<select id="winnerSelect"></select>
+<button onclick="decideWinner()">勝者決定</button>
 
 <pre id="output"></pre>
 
 <script>
-function winner(){
-  const name = document.getElementById("winnerName").value;
-  fetch(`/winner/${name}`).then(r=>r.json()).then(show);
+
+// =====================
+// 状態取得
+// =====================
+function loadState() {
+  fetch("/state")
+    .then(res => res.json())
+    .then(data => {
+
+      document.getElementById("output").textContent =
+        JSON.stringify(data, null, 2);
+
+      const playersDiv = document.getElementById("players");
+      const winnerSelect = document.getElementById("winnerSelect");
+
+      playersDiv.innerHTML = "";
+      winnerSelect.innerHTML = "";
+
+      for (let name in data.players) {
+
+        // 一覧表示
+        const p = document.createElement("p");
+        p.textContent = `${name} : ${Math.floor(data.players[name])}`;
+        playersDiv.appendChild(p);
+
+        // 勝者選択用
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        winnerSelect.appendChild(option);
+      }
+    });
 }
 
-function loadState(){
-  fetch(`/state`).then(r=>r.json()).then(show);
+
+// =====================
+// 勝者決定（POST /winner）
+// =====================
+function decideWinner() {
+
+  const name = document.getElementById("winnerSelect").value;
+
+  fetch("/winner", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name })
+  })
+  .then(res => res.json())
+  .then(data => {
+    loadState();
+  });
 }
 
-function show(data){
-  document.getElementById("output").textContent =
-  JSON.stringify(data,null,2);
-}
+// 自動更新
+setInterval(loadState, 2000);
+
 </script>
+
 </body>
 </html>
