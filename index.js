@@ -4,12 +4,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-// ===== デバッグログ =====
-app.use((req,res,next)=>{
-  console.log("API:", req.method, req.url);
-  next();
-});
-
 let game = {
   players:{},
   bets:{},
@@ -22,6 +16,7 @@ let game = {
   minBet:5,
   interestRate:0.05
 };
+
 
 // =====================
 // 参加
@@ -38,7 +33,7 @@ app.post("/join",(req,res)=>{
 
 
 // =====================
-// ベット
+// BET（増額のみ可能）
 // =====================
 app.post("/bet",(req,res)=>{
 
@@ -47,16 +42,23 @@ app.post("/bet",(req,res)=>{
   if(!game.players[name])
     return res.send("未参加");
 
+  if(amount < game.minBet)
+    return res.send("最低賭け金不足");
+
   const debt = game.loans[name]?.amount || 0;
   const maxBet = game.players[name] + debt;
 
   if(amount > maxBet)
     return res.send("賭けすぎ");
 
-  if(amount < game.minBet)
-    return res.send("最低賭け金不足");
+  const currentBet = game.bets[name] || 0;
 
-  game.bets[name]=amount;
+  // ⭐ 減額禁止
+  if(amount < currentBet){
+    return res.send("ベットは減らせません");
+  }
+
+  game.bets[name] = amount;
 
   res.json(game);
 });
@@ -70,10 +72,9 @@ app.post("/loan/request",(req,res)=>{
   const {name,amount}=req.body;
 
   const others =
-    Object.keys(game.players)
-      .filter(p=>p!==name);
+    Object.keys(game.players).filter(p=>p!==name);
 
-  if(others.length===0)
+  if(!others.length)
     return res.send("貸す人なし");
 
   const lender =
@@ -81,10 +82,10 @@ app.post("/loan/request",(req,res)=>{
 
   game.loanRequests[lender]={
     borrower:name,
-    amount:amount
+    amount
   };
 
-  res.json({ lender, amount });
+  res.json({lender,amount});
 });
 
 
@@ -105,7 +106,7 @@ app.post("/loan/accept",(req,res)=>{
 
   game.loans[borrower]={
     lender:name,
-    amount:amount
+    amount
   };
 
   delete game.loanRequests[name];
@@ -137,8 +138,8 @@ app.post("/loan/repay",(req,res)=>{
   if(game.players[name] < loan.amount)
     return res.send("所持金不足");
 
-  game.players[name] -= loan.amount;
-  game.players[loan.lender] += loan.amount;
+  game.players[name]-=loan.amount;
+  game.players[loan.lender]+=loan.amount;
 
   delete game.loans[name];
 
@@ -147,50 +148,48 @@ app.post("/loan/repay",(req,res)=>{
 
 
 // =====================
-// ⭐ 勝者処理（割合倍率）
+// 勝者決定（割合倍率）
 // =====================
 app.post("/winner",(req,res)=>{
 
   const {name}=req.body;
 
-  let totalPot = 0;
+  let totalPot=0;
 
   for(let p in game.bets){
-    totalPot += game.bets[p];
-    game.players[p] -= game.bets[p];
+    totalPot+=game.bets[p];
+    game.players[p]-=game.bets[p];
   }
 
-  const winnerBet = game.bets[name];
-  const percent =
-    (winnerBet / game.startMoney) * 100;
+  const winnerBet=game.bets[name];
+  const percent=(winnerBet/game.startMoney)*100;
 
-  let multiplier = 1.2;
+  let multiplier=1.2;
 
-  if(percent >= 500) multiplier = 5.0;
-  else if(percent >= 200) multiplier = 3.0;
-  else if(percent >= 150) multiplier = 2.0;
-  else if(percent >= 100) multiplier = 1.9;
-  else if(percent >= 75) multiplier = 1.8;
-  else if(percent >= 50) multiplier = 1.5;
-  else if(percent >= 20) multiplier = 1.4;
+  if(percent>=500) multiplier=5.0;
+  else if(percent>=200) multiplier=3.0;
+  else if(percent>=150) multiplier=2.0;
+  else if(percent>=100) multiplier=1.9;
+  else if(percent>=75) multiplier=1.8;
+  else if(percent>=50) multiplier=1.5;
+  else if(percent>=20) multiplier=1.4;
 
-  const reward =
-    Math.floor(totalPot * multiplier);
+  const reward=Math.floor(totalPot*multiplier);
 
-  game.players[name] += reward;
+  game.players[name]+=reward;
 
-  // 利息
+  // 利息処理
   for(let borrower in game.loans){
 
-    const loan = game.loans[borrower];
-    const interest =
-      Math.floor(loan.amount * game.interestRate);
+    const loan=game.loans[borrower];
+    const interest=
+      Math.floor(loan.amount*game.interestRate);
 
-    if(game.players[borrower] >= interest){
+    if(game.players[borrower]>=interest){
       game.players[borrower]-=interest;
       game.players[loan.lender]+=interest;
     }else{
-      loan.amount += interest;
+      loan.amount+=interest;
     }
   }
 
@@ -199,10 +198,9 @@ app.post("/winner",(req,res)=>{
 
   res.json({
     winner:name,
-    percent:Math.floor(percent),
+    reward,
     multiplier,
     pot:totalPot,
-    reward,
     players:game.players
   });
 });
