@@ -16,10 +16,14 @@
   <button onclick="joinGame()">参加する</button>
 </div>
 
-<!-- ===== ゲーム画面 ===== -->
+<!-- ===== ホーム / ゲーム画面 ===== -->
 <div id="game" style="display:none;">
 
   <p>プレイヤー: <span id="displayName"></span></p>
+  <p>💰 所持金: <span id="money">0</span></p>
+  <p>🎯 ラウンド: <span id="round">1</span></p>
+
+  <hr>
 
   <input id="betAmount" type="number" placeholder="賭け金">
   <button onclick="bet()">ベット</button>
@@ -37,7 +41,7 @@
 let currentName = "";
 
 // =====================
-// 参加（POST /join）
+// 参加
 // =====================
 function joinGame() {
   const name = document.getElementById("playerName").value;
@@ -51,7 +55,7 @@ function joinGame() {
     body: JSON.stringify({ name })
   })
   .then(res => res.json())
-  .then(data => {
+  .then(() => {
     currentName = name;
 
     document.getElementById("displayName").textContent = name;
@@ -65,7 +69,7 @@ function joinGame() {
 
 
 // =====================
-// ベット（POST /bet）
+// ベット
 // =====================
 function bet() {
 
@@ -84,23 +88,38 @@ function bet() {
     })
   })
   .then(res => res.json())
-  .then(data => {
+  .then(() => {
     loadState();
   });
 }
 
 
 // =====================
-// 状態取得（GET /state）
+// 状態取得
 // =====================
 function loadState() {
   fetch("/state")
     .then(res => res.json())
     .then(data => {
+
+      // デバッグ表示
       document.getElementById("output").textContent =
         JSON.stringify(data, null, 2);
+
+      // 所持金表示
+      if (data.players[currentName] !== undefined) {
+        document.getElementById("money").textContent =
+          Math.floor(data.players[currentName]);
+      }
+
+      // ラウンド表示
+      document.getElementById("round").textContent =
+        data.round;
     });
 }
+
+// ⭐ 自動更新（超重要）
+setInterval(loadState, 2000);
 
 </script>
 
