@@ -60,7 +60,15 @@ button{
 <p>💳 借金: <span id="debt">なし</span></p>
 </div>
 
-<!-- 信用 -->
+<!-- 🎮 ゲーム状況 -->
+<div class="card">
+<h3>🎮 ゲーム状況</h3>
+<p>ラウンド : <span id="round">1</span></p>
+<p>POT : <span id="pot">0</span></p>
+<p>現在倍率 : <span id="multiplier">1.2x</span></p>
+</div>
+
+<!-- ⭐ 信用 -->
 <div class="card">
 <h3>⭐ 信用ポイント</h3>
 
@@ -108,9 +116,23 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 let currentName="";
 
+function calcMultiplier(amount,startMoney){
+ const percent=(amount/startMoney)*100;
+
+ if(percent>=500) return 5;
+ if(percent>=200) return 3;
+ if(percent>=150) return 2;
+ if(percent>=100) return 1.9;
+ if(percent>=75) return 1.8;
+ if(percent>=50) return 1.5;
+ if(percent>=20) return 1.4;
+
+ return 1.2;
+}
+
 // ===== 参加 =====
 function joinGame(){
- const name=document.getElementById("playerName").value;
+ const name=playerName.value;
 
  fetch("/join",{
   method:"POST",
@@ -152,11 +174,6 @@ function requestLoan(){
   method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({name:currentName,amount})
- })
- .then(r=>r.json())
- .then(d=>{
-   if(d.failed) alert("信用不足で通知が届かなかった");
-   else alert("貸し手："+d.lender);
  });
 }
 
@@ -166,15 +183,7 @@ function exchangeTrust(){
   method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({name:currentName})
- })
- .then(r=>r.text())
- .then(msg=>{
-   if(msg.includes("不足")||msg.includes("できません")){
-     alert(msg);
-     return;
-   }
-   loadState();
- });
+ }).then(loadState);
 }
 
 // ===== 状態更新 =====
@@ -184,14 +193,27 @@ function loadState(){
  .then(r=>r.json())
  .then(data=>{
 
-  // 所持金
   money.textContent=Math.floor(data.players[currentName]);
 
-  // 借金
   const loan=data.loans[currentName];
   debt.textContent=loan?loan.amount:"なし";
 
-  // ===== 信用 =====
+  // ラウンド
+  round.textContent=data.round;
+
+  // POT
+  let pot=0;
+  for(let p in data.bets) pot+=data.bets[p];
+  document.getElementById("pot").textContent=pot;
+
+  // 倍率
+  const myBet=data.bets[currentName]||0;
+  multiplier.textContent =
+    myBet>0
+      ? calcMultiplier(myBet,data.startMoney)+"x"
+      : "1.2x";
+
+  // 信用
   const trust=data.trust[currentName]||0;
   trustValue.textContent=trust;
 
@@ -210,7 +232,7 @@ function loadState(){
   else if(chance>=50) trustValue.style.color="#f39c12";
   else trustValue.style.color="#e74c3c";
 
-  // ===== 返済ボタン =====
+  // 返済
   repayArea.innerHTML="";
   if(loan){
     const btn=document.createElement("button");
@@ -225,7 +247,7 @@ function loadState(){
     repayArea.appendChild(btn);
   }
 
-  // ===== 借金通知 =====
+  // 借金通知
   if(data.loanRequests[currentName]){
     const req=data.loanRequests[currentName];
 
@@ -242,21 +264,15 @@ function loadState(){
     }
   }
 
-  // ===== プレイヤー一覧 =====
+  // プレイヤー一覧
   playerList.innerHTML="";
-
   for(let p in data.players){
-
     const div=document.createElement("div");
 
-    if(data.bets[p]){
-      div.className="betActive";
-      div.textContent=
-        `${p} : ${Math.floor(data.players[p])} (BET ${data.bets[p]})`;
-    }else{
-      div.textContent=
-        `${p} : ${Math.floor(data.players[p])}`;
-    }
+    div.className=data.bets[p]?"betActive":"";
+    div.textContent =
+      `${p} : ${Math.floor(data.players[p])}` +
+      (data.bets[p]?` (BET ${data.bets[p]})`:"");
 
     playerList.appendChild(div);
   }
