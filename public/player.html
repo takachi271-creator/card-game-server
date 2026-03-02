@@ -9,17 +9,21 @@
 
 <h2>プレイヤー</h2>
 
+<!-- ロビー -->
 <div id="lobby">
   <input id="playerName" placeholder="名前">
   <button onclick="joinGame()">参加</button>
 </div>
 
+<!-- ゲーム画面 -->
 <div id="game" style="display:none;">
 
 <p>名前: <span id="displayName"></span></p>
 <p>💰 所持金: <span id="money">0</span></p>
 <p>🎯 ラウンド: <span id="round">1</span></p>
+
 <p>🔥 POT: <span id="pot">0</span></p>
+<p>前回結果: <span id="lastResult">---</span></p>
 
 <hr>
 
@@ -30,22 +34,18 @@
 
 <hr>
 
+<h3>借金</h3>
+<input id="loanAmount" type="number" placeholder="借りたい額">
+<button onclick="requestLoan()">借りる</button>
+
+<div id="repayArea"></div>
+
+<hr>
+
+<h3>参加プレイヤー</h3>
 <div id="playerList"></div>
 
 </div>
-
-<!-- ラウンド結果表示 -->
-<div id="roundResult" style="
-position:fixed;
-top:40%;
-left:50%;
-transform:translate(-50%,-50%);
-font-size:48px;
-font-weight:bold;
-display:none;
-pointer-events:none;
-z-index:999;
-"></div>
 
 <script>
 
@@ -128,43 +128,68 @@ function loadState(){
 
   const money=data.players[currentName];
 
-  document.getElementById("money").textContent=Math.floor(money);
-  document.getElementById("round").textContent=data.round;
+  document.getElementById("money").textContent=
+    Math.floor(money);
 
-  // POT
+  document.getElementById("round").textContent=
+    data.round;
+
+  // POT計算
   let pot=0;
   for(let p in data.bets){
     pot+=data.bets[p];
   }
   document.getElementById("pot").textContent=pot;
 
-  // ===== ラウンド結果表示 =====
+  // ===== 前回結果表示 =====
   if(lastMoney!==null && data.round!==lastRound){
 
     const diff=Math.floor(money-lastMoney);
-    const box=document.getElementById("roundResult");
+    const result=document.getElementById("lastResult");
 
-    if(diff!==0){
-      box.textContent =
-        (diff>0?"+":"") + diff;
-
-      box.style.color =
-        diff>0 ? "gold" : "red";
-
-      box.style.display="block";
-
-      setTimeout(()=>{
-        box.style.display="none";
-      },2000);
+    if(diff>0){
+      result.textContent="+"+diff;
+      result.style.color="lime";
+    }else if(diff<0){
+      result.textContent=diff;
+      result.style.color="red";
+    }else{
+      result.textContent="±0";
+      result.style.color="white";
     }
   }
 
   lastMoney=money;
   lastRound=data.round;
 
+  // ===== プレイヤー一覧 =====
+  const list=document.getElementById("playerList");
+  list.innerHTML="";
+
+  for(let p in data.players){
+
+    const div=document.createElement("div");
+
+    let text=p;
+
+    if(data.bets[p]){
+      text+=" : BET "+data.bets[p];
+    }else{
+      text+=" : 待機中";
+    }
+
+    if(p===currentName){
+      div.style.textDecoration="underline";
+    }
+
+    div.textContent=text;
+    list.appendChild(div);
+  }
+
  });
 }
 
+// 自動更新
 setInterval(loadState,2000);
 
 </script>
