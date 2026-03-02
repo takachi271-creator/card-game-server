@@ -25,6 +25,9 @@
 
   <hr>
 
+  <!-- ⭐ ベット人数カウント -->
+  <p>🃏 ベット状況: <span id="betCount">0 / 0</span></p>
+
   <input id="betAmount" type="number" placeholder="賭け金">
   <button onclick="bet()">ベット</button>
 
@@ -54,13 +57,12 @@ function joinGame() {
 
   fetch("/join", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ name })
   })
   .then(res => res.json())
   .then(() => {
+
     currentName = name;
 
     document.getElementById("displayName").textContent = name;
@@ -71,42 +73,38 @@ function joinGame() {
   });
 }
 
-
 // =====================
 // ベット
 // =====================
 function bet() {
 
-  const amount = parseInt(
-    document.getElementById("betAmount").value
-  );
+  const amount =
+    parseInt(document.getElementById("betAmount").value);
 
   fetch("/bet", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
       name: currentName,
       amount: amount
     })
   })
-  .then(res => res.json())
-  .then(() => loadState());
+  .then(res=>res.json())
+  .then(()=>loadState());
 }
-
 
 // =====================
 // 状態取得
 // =====================
 function loadState() {
+
   fetch("/state")
-    .then(res => res.json())
-    .then(data => {
+    .then(res=>res.json())
+    .then(data=>{
 
       // デバッグ表示
       document.getElementById("output").textContent =
-        JSON.stringify(data, null, 2);
+        JSON.stringify(data,null,2);
 
       // 所持金
       if (data.players[currentName] !== undefined) {
@@ -118,21 +116,36 @@ function loadState() {
       document.getElementById("round").textContent =
         data.round;
 
+      // ⭐ ベット人数カウント
+      const totalPlayers =
+        Object.keys(data.players).length;
+
+      const betPlayers =
+        Object.keys(data.bets).length;
+
+      document.getElementById("betCount").textContent =
+        betPlayers + " / " + totalPlayers;
+
       // ⭐ プレイヤー一覧
-      const list = document.getElementById("playerList");
+      const list =
+        document.getElementById("playerList");
+
       list.innerHTML = "";
 
       for (let name in data.players) {
 
-        const div = document.createElement("div");
+        const div =
+          document.createElement("div");
 
         if (data.bets[name]) {
-          div.textContent = name + " : BET " + data.bets[name];
+          div.textContent =
+            name + " : BET " + data.bets[name];
         } else {
-          div.textContent = name + " : 待機中";
+          div.textContent =
+            name + " : 待機中";
         }
 
-        // 自分だけ少し強調
+        // 自分を強調
         if (name === currentName) {
           div.style.fontWeight = "bold";
         }
@@ -142,8 +155,8 @@ function loadState() {
     });
 }
 
-// ⭐ 自動更新
-setInterval(loadState, 2000);
+// ⭐ 自動更新（超重要）
+setInterval(loadState,2000);
 
 </script>
 
