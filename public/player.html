@@ -47,7 +47,7 @@ input{
   border-radius:10px;
   border:none;
   margin-top:6px;
-  box-sizing:border-box; /* ⭐ はみ出し防止 */
+  box-sizing:border-box;
 }
 
 #playerList div{
@@ -74,6 +74,7 @@ input{
 
 <div class="card">
 <p>💰 所持金: <span id="money">0</span></p>
+<p id="debtLine">💳 借金: なし</p>
 <p>🎯 ラウンド: <span id="round">1</span></p>
 <p>🔥 POT: <span id="pot">0</span></p>
 <p>前回結果: <span id="lastResult">---</span></p>
@@ -119,12 +120,9 @@ function joinGame(){
  })
  .then(()=>{
   currentName=name;
-
   document.getElementById("titleName").textContent=name;
-
   document.getElementById("lobby").style.display="none";
   document.getElementById("game").style.display="block";
-
   loadState();
  });
 }
@@ -211,6 +209,17 @@ function loadState(){
   document.getElementById("money").textContent=Math.floor(money);
   document.getElementById("round").textContent=data.round;
 
+  // 借金表示
+  const debtLine=document.getElementById("debtLine");
+  if(data.loans[currentName]){
+    debtLine.textContent="💳 借金: "+data.loans[currentName].amount;
+    debtLine.style.color="orange";
+  }else{
+    debtLine.textContent="💳 借金: なし";
+    debtLine.style.color="white";
+  }
+
+  // POT
   let pot=0;
   for(let p in data.bets){ pot+=data.bets[p]; }
   document.getElementById("pot").textContent=pot;
@@ -236,7 +245,7 @@ function loadState(){
   lastMoney=money;
   lastRound=data.round;
 
-  // ===== 借金通知 =====
+  // 借金通知
   if(data.loanRequests[currentName] && !loanPopupShown){
 
     loanPopupShown=true;
@@ -256,6 +265,28 @@ function loadState(){
 
   if(!data.loanRequests[currentName]){
     loanPopupShown=false;
+  }
+
+  // 返済UI
+  const repayArea=document.getElementById("repayArea");
+  repayArea.innerHTML="";
+
+  if(data.loans[currentName]){
+
+    const loan=data.loans[currentName];
+
+    const btn=document.createElement("button");
+    btn.textContent="全額返済";
+
+    btn.onclick=()=>{
+      fetch("/loan/repay",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:currentName})
+      }).then(()=>loadState());
+    };
+
+    repayArea.appendChild(btn);
   }
 
   // プレイヤー一覧
