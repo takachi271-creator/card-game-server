@@ -9,20 +9,17 @@
 
 <h2>プレイヤー</h2>
 
-<!-- ロビー -->
 <div id="lobby">
   <input id="playerName" placeholder="名前">
   <button onclick="joinGame()">参加</button>
 </div>
 
-<!-- ゲーム画面 -->
 <div id="game" style="display:none;">
 
 <p>名前: <span id="displayName"></span></p>
 <p>💰 所持金: <span id="money">0</span></p>
 <p>🎯 ラウンド: <span id="round">1</span></p>
 <p>🔥 POT: <span id="pot">0</span></p>
-<p>💸 利息: <span id="interest">0</span>%</p>
 
 <hr>
 
@@ -33,28 +30,18 @@
 
 <hr>
 
-<h3>借金</h3>
-<input id="loanAmount" type="number" placeholder="借りたい額">
-<button onclick="requestLoan()">借りる</button>
-
-<div id="repayArea"></div>
-
-<hr>
-
-<h3>参加プレイヤー</h3>
 <div id="playerList"></div>
 
 </div>
 
-<!-- 勝利表示 -->
-<div id="winEffect" style="
+<!-- ラウンド結果表示 -->
+<div id="roundResult" style="
 position:fixed;
 top:40%;
 left:50%;
 transform:translate(-50%,-50%);
 font-size:48px;
 font-weight:bold;
-color:gold;
 display:none;
 pointer-events:none;
 z-index:999;
@@ -63,7 +50,8 @@ z-index:999;
 <script>
 
 let currentName="";
-let lastReward=0;
+let lastRound=1;
+let lastMoney=null;
 
 
 // ===== 参加 =====
@@ -102,39 +90,16 @@ function bet(){
 }
 
 
-// ===== 借金申請 =====
-function requestLoan(){
-
- const amount=parseInt(
-   document.getElementById("loanAmount").value);
-
- fetch("/loan/request",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({
-    name:currentName,
-    amount:amount
-  })
- })
- .then(res=>res.json())
- .then(data=>{
-   alert("貸し手候補: "+data.lender);
- });
-}
-
-
 // ===== 倍率プレビュー =====
 function calculateMultiplier(amount){
 
-  const percent=amount;
-
-  if(percent>=500) return 5.0;
-  if(percent>=200) return 3.0;
-  if(percent>=150) return 2.0;
-  if(percent>=100) return 1.9;
-  if(percent>=75) return 1.8;
-  if(percent>=50) return 1.5;
-  if(percent>=20) return 1.4;
+  if(amount>=500) return 5.0;
+  if(amount>=200) return 3.0;
+  if(amount>=150) return 2.0;
+  if(amount>=100) return 1.9;
+  if(amount>=75) return 1.8;
+  if(amount>=50) return 1.5;
+  if(amount>=20) return 1.4;
 
   return 1.2;
 }
@@ -147,10 +112,8 @@ document.addEventListener("DOMContentLoaded",()=>{
     const amount=parseInt(
       document.getElementById("betAmount").value)||0;
 
-    const multi=calculateMultiplier(amount);
-
     document.getElementById("previewMultiplier")
-      .textContent=multi;
+      .textContent=calculateMultiplier(amount);
   });
 
 });
@@ -165,97 +128,43 @@ function loadState(){
 
   const money=data.players[currentName];
 
-  document.getElementById("money").textContent=
-    Math.floor(money);
+  document.getElementById("money").textContent=Math.floor(money);
+  document.getElementById("round").textContent=data.round;
 
-  document.getElementById("round").textContent=
-    data.round;
-
-  document.getElementById("interest").textContent=
-    Math.floor(data.interestRate*100);
-
-  // POT計算
+  // POT
   let pot=0;
   for(let p in data.bets){
     pot+=data.bets[p];
   }
   document.getElementById("pot").textContent=pot;
 
-  // ===== 勝利報酬エフェクト =====
-  if(data.reward && data.reward!==lastReward){
+  // ===== ラウンド結果表示 =====
+  if(lastMoney!==null && data.round!==lastRound){
 
-    const effect=document.getElementById("winEffect");
+    const diff=Math.floor(money-lastMoney);
+    const box=document.getElementById("roundResult");
 
-    effect.textContent="+"+data.reward;
-    effect.style.display="block";
+    if(diff!==0){
+      box.textContent =
+        (diff>0?"+":"") + diff;
 
-    setTimeout(()=>{
-      effect.style.display="none";
-    },2000);
+      box.style.color =
+        diff>0 ? "gold" : "red";
 
-    lastReward=data.reward;
+      box.style.display="block";
+
+      setTimeout(()=>{
+        box.style.display="none";
+      },2000);
+    }
   }
 
-  // ===== 返済UI =====
-  const repayArea=document.getElementById("repayArea");
-  repayArea.innerHTML="";
-
-  if(data.loans[currentName]){
-
-    const loan=data.loans[currentName];
-
-    const info=document.createElement("p");
-    info.textContent="借金："+loan.amount;
-
-    const btn=document.createElement("button");
-    btn.textContent="全額返済";
-
-    btn.onclick=()=>{
-      fetch("/loan/repay",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:currentName})
-      }).then(()=>loadState());
-    };
-
-    repayArea.appendChild(info);
-    repayArea.appendChild(btn);
-  }
-
-  // ===== プレイヤー一覧 =====
-  const list=document.getElementById("playerList");
-  list.innerHTML="";
-
-  for(let p in data.players){
-
-    const div=document.createElement("div");
-
-    let text=p;
-
-    if(data.bets[p]){
-      text+=" : BET "+data.bets[p];
-    }else{
-      text+=" : 待機中";
-    }
-
-    if(data.loans[p]){
-      text+=" | 借金:"+data.loans[p].amount;
-      div.style.color="red";
-      div.style.fontWeight="bold";
-    }
-
-    if(p===currentName){
-      div.style.textDecoration="underline";
-    }
-
-    div.textContent=text;
-    list.appendChild(div);
-  }
+  lastMoney=money;
+  lastRound=data.round;
 
  });
 }
 
-// 自動更新
 setInterval(loadState,2000);
 
 </script>
