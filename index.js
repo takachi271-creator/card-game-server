@@ -5,104 +5,124 @@ app.use(express.json());
 app.use(express.static("public"));
 
 let game = {
-  players: {},      // { name: money }
-  bets: {},         // { name: amount }
+  players: {},
+  bets: {},
+  loans: {},        // { borrower:{ lender, amount } }
+  loanRequests: {}, // 申請中
   round: 1,
-  maxRound: 30,
   multiplier: 1.2,
-  minBet: 5,
-  started: false
+  minBet: 5
 };
 
-// サーバー確認
-app.get("/", (req, res) => {
-  res.send("ゲーム稼働開始");
-});
+// ===== 参加 =====
+app.post("/join", (req,res)=>{
+  const {name}=req.body;
 
-
-// =========================
-// プレイヤー参加
-// =========================
-app.post("/join", (req, res) => {
-  const { name } = req.body;
-
-  if (!name) return res.status(400).send("名前必要");
-
-  if (!game.players[name]) {
-    game.players[name] = 100; // 初期所持金
+  if(!game.players[name]){
+    game.players[name]=100;
   }
 
-  res.json({
-    message: "参加成功",
-    players: game.players
-  });
-});
-
-
-// =========================
-// ベット
-// =========================
-app.post("/bet", (req, res) => {
-  const { name, amount } = req.body;
-
-  if (!game.players[name]) {
-    return res.status(400).send("未参加");
-  }
-
-  if (amount < game.minBet) {
-    return res.status(400).send("最低賭け金不足");
-  }
-
-  if (amount > game.players[name]) {
-    return res.status(400).send("所持金不足");
-  }
-
-  game.bets[name] = amount;
-
-  res.json({
-    message: "ベット完了",
-    bets: game.bets
-  });
-});
-
-
-// =========================
-// 勝者処理（ホスト用）
-// =========================
-app.post("/winner", (req, res) => {
-  const { name } = req.body;
-
-  if (!game.bets[name]) {
-    return res.status(400).send("その人は賭けてない");
-  }
-
-  for (let player in game.bets) {
-    if (player === name) {
-      game.players[player] += game.bets[player] * game.multiplier;
-    } else {
-      game.players[player] -= game.bets[player];
-    }
-  }
-
-  game.bets = {};
-  game.round++;
-
-  res.json({
-    winner: name,
-    players: game.players,
-    round: game.round
-  });
-});
-
-
-// =========================
-// 状態確認
-// =========================
-app.get("/state", (req, res) => {
   res.json(game);
 });
 
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+// ===== ベット =====
+app.post("/bet",(req,res)=>{
+  const {name,amount}=req.body;
+
+  game.bets[name]=amount;
+  res.json(game);
+});
+
+
+// =====================
+// ⭐ 借金申請
+// =====================
+app.post("/loan/request",(req,res)=>{
+
+  const {name, amount}=req.body;
+
+  const others = Object.keys(game.players)
+    .filter(p=>p!==name);
+
+  if(others.length===0)
+    return res.send("貸す人がいない");
+
+  // ランダム選出
+  const lender =
+    others[Math.floor(Math.random()*others.length)];
+
+  game.loanRequests[lender]={
+    borrower:name,
+    amount:amount
+  };
+
+  res.json({
+    lender:lender,
+    amount:amount
+  });
+});
+
+
+// =====================
+// ⭐ 承認
+// =====================
+app.post("/loan/accept",(req,res)=>{
+
+  const {name}=req.body;
+
+  const reqLoan=game.loanRequests[name];
+  if(!reqLoan) return res.send("申請なし");
+
+  const {borrower,amount}=reqLoan;
+
+  game.players[name]-=amount;
+  game.players[borrower]+=amount;
+
+  game.loans[borrower]={
+    lender:name,
+    amount:amount
+  };
+
+  delete game.loanRequests[name];
+
+  res.json(game);
+});
+
+
+// =====================
+// ⭐ 拒否
+// =====================
+app.post("/loan/reject",(req,res)=>{
+  const {name}=req.body;
+
+  delete game.loanRequests[name];
+  res.json(game);
+});
+
+
+// ===== 勝者 =====
+app.post("/winner",(req,res)=>{
+  const {name}=req.body;
+
+  for(let p in game.bets){
+    if(p===name){
+      game.players[p]+=game.bets[p]*game.multiplier;
+    }else{
+      game.players[p]-=game.bets[p];
+    }
+  }
+
+  game.bets={};
+  game.round++;
+
+  res.json(game);
+});
+
+app.get("/state",(req,res)=>{
+  res.json(game);
+});
+
+app.listen(3000,()=>{
+  console.log("Server running");
 });
