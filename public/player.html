@@ -21,6 +21,7 @@
 <p>名前: <span id="displayName"></span></p>
 <p>💰 所持金: <span id="money">0</span></p>
 <p>🎯 ラウンド: <span id="round">1</span></p>
+<p>🔥 POT: <span id="pot">0</span></p>
 <p>💸 利息: <span id="interest">0</span>%</p>
 
 <hr>
@@ -34,7 +35,7 @@
 <input id="loanAmount" type="number" placeholder="借りたい額">
 <button onclick="requestLoan()">借りる</button>
 
-<!-- ⭐ 返済表示 -->
+<!-- ===== 返済 ===== -->
 <div id="repayArea"></div>
 
 <hr>
@@ -123,6 +124,13 @@ function loadState(){
   document.getElementById("interest").textContent =
     Math.floor(data.interestRate*100);
 
+  // ⭐ POT計算
+  let pot=0;
+  for(let p in data.bets){
+    pot+=data.bets[p];
+  }
+  document.getElementById("pot").textContent=pot;
+
   // ===== 借金承認 =====
   if(data.loanRequests[currentName]){
     const req=data.loanRequests[currentName];
@@ -142,7 +150,7 @@ function loadState(){
     }
   }
 
-  // ===== ⭐ 返済UI =====
+  // ===== 返済UI =====
   const repayArea=document.getElementById("repayArea");
   repayArea.innerHTML="";
 
@@ -202,7 +210,7 @@ function loadState(){
  });
 }
 
-// 自動更新
+// ⭐ 自動更新
 setInterval(loadState,2000);
 
 </script>
