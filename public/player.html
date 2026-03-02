@@ -46,7 +46,7 @@
 
 </div>
 
-<!-- 勝利エフェクト -->
+<!-- 勝利表示 -->
 <div id="winEffect" style="
 position:fixed;
 top:40%;
@@ -63,8 +63,7 @@ z-index:999;
 <script>
 
 let currentName="";
-let lastRound=1;
-let lastMoney=0;
+let lastReward=0;
 
 
 // ===== 参加 =====
@@ -175,32 +174,27 @@ function loadState(){
   document.getElementById("interest").textContent=
     Math.floor(data.interestRate*100);
 
-  // POT
+  // POT計算
   let pot=0;
   for(let p in data.bets){
     pot+=data.bets[p];
   }
   document.getElementById("pot").textContent=pot;
 
-  // ===== 勝利エフェクト =====
-  if(lastRound!==data.round){
+  // ===== 勝利報酬エフェクト =====
+  if(data.reward && data.reward!==lastReward){
 
-    const diff=Math.floor(money-lastMoney);
+    const effect=document.getElementById("winEffect");
 
-    if(diff>0){
-      const effect=document.getElementById("winEffect");
-      effect.textContent="+"+diff;
-      effect.style.display="block";
+    effect.textContent="+"+data.reward;
+    effect.style.display="block";
 
-      setTimeout(()=>{
-        effect.style.display="none";
-      },2000);
-    }
+    setTimeout(()=>{
+      effect.style.display="none";
+    },2000);
 
-    lastRound=data.round;
+    lastReward=data.reward;
   }
-
-  lastMoney=money;
 
   // ===== 返済UI =====
   const repayArea=document.getElementById("repayArea");
