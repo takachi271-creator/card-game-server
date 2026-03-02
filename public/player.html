@@ -15,7 +15,7 @@
   <button onclick="joinGame()">参加</button>
 </div>
 
-<!-- ===== ゲーム画面 ===== -->
+<!-- ===== ゲーム ===== -->
 <div id="game" style="display:none;">
 
 <p>名前: <span id="displayName"></span></p>
@@ -33,6 +33,9 @@
 <h3>借金</h3>
 <input id="loanAmount" type="number" placeholder="借りたい額">
 <button onclick="requestLoan()">借りる</button>
+
+<!-- ⭐ 返済表示 -->
+<div id="repayArea"></div>
 
 <hr>
 
@@ -58,7 +61,6 @@ function joinGame(){
   body:JSON.stringify({name})
  })
  .then(()=>{
-
   currentName=name;
 
   document.getElementById("displayName").textContent=name;
@@ -112,19 +114,16 @@ function loadState(){
  .then(res=>res.json())
  .then(data=>{
 
-  // 所持金
   document.getElementById("money").textContent =
     Math.floor(data.players[currentName]);
 
-  // ラウンド
   document.getElementById("round").textContent =
     data.round;
 
-  // ⭐ 利息表示
   document.getElementById("interest").textContent =
     Math.floor(data.interestRate*100);
 
-  // ===== 借金承認ポップアップ =====
+  // ===== 借金承認 =====
   if(data.loanRequests[currentName]){
     const req=data.loanRequests[currentName];
 
@@ -143,6 +142,32 @@ function loadState(){
     }
   }
 
+  // ===== ⭐ 返済UI =====
+  const repayArea=document.getElementById("repayArea");
+  repayArea.innerHTML="";
+
+  if(data.loans[currentName]){
+
+    const loan=data.loans[currentName];
+
+    const info=document.createElement("p");
+    info.textContent="借金："+loan.amount;
+
+    const btn=document.createElement("button");
+    btn.textContent="全額返済する";
+
+    btn.onclick=()=>{
+      fetch("/loan/repay",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:currentName})
+      }).then(()=>loadState());
+    };
+
+    repayArea.appendChild(info);
+    repayArea.appendChild(btn);
+  }
+
   // ===== プレイヤー一覧 =====
   const list=document.getElementById("playerList");
   list.innerHTML="";
@@ -159,7 +184,6 @@ function loadState(){
       text+=" : 待機中";
     }
 
-    // ⭐ 借金額表示
     if(data.loans[p]){
       text+=" | 借金:"+data.loans[p].amount;
       div.style.color="red";
@@ -178,7 +202,7 @@ function loadState(){
  });
 }
 
-// ⭐ 自動更新
+// 自動更新
 setInterval(loadState,2000);
 
 </script>
