@@ -22,6 +22,8 @@
 
   <p>プレイヤー: <span id="displayName"></span></p>
 
+  <p>現在のベット: <span id="currentBet">0</span></p>
+
   <input id="betAmount" type="number" placeholder="賭け金">
   <button onclick="bet()">ベット</button>
 
@@ -68,6 +70,11 @@ function loadState(){
 function show(data){
   document.getElementById("output").textContent =
     JSON.stringify(data,null,2);
+
+  if (data.bets && data.bets[currentName]) {
+    document.getElementById("currentBet").textContent =
+      data.bets[currentName];
+  }
 }
 
 </script>
