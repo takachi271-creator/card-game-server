@@ -3,6 +3,59 @@
 <head>
 <meta charset="UTF-8">
 <title>Player</title>
+
+<style>
+body{
+  margin:0;
+  font-family:sans-serif;
+  background:#111;
+  color:white;
+}
+
+h2{
+  text-align:center;
+  margin:12px 0;
+}
+
+.container{
+  padding:12px;
+}
+
+.card{
+  background:#1c1c1c;
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:12px;
+}
+
+button{
+  width:100%;
+  padding:14px;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  background:#2ecc71;
+  color:white;
+  margin-top:8px;
+}
+
+input{
+  width:100%;
+  padding:14px;
+  font-size:18px;
+  border-radius:10px;
+  border:none;
+  margin-top:6px;
+}
+
+#playerList div{
+  background:#1a1a1a;
+  margin:6px 0;
+  padding:10px;
+  border-radius:8px;
+}
+</style>
+
 </head>
 
 <body>
@@ -10,40 +63,37 @@
 <h2>プレイヤー</h2>
 
 <!-- ロビー -->
-<div id="lobby">
+<div id="lobby" class="container">
   <input id="playerName" placeholder="名前">
   <button onclick="joinGame()">参加</button>
 </div>
 
-<!-- ゲーム画面 -->
-<div id="game" style="display:none;">
+<!-- ゲーム -->
+<div id="game" class="container" style="display:none;">
 
-<p>名前: <span id="displayName"></span></p>
+<div class="card">
 <p>💰 所持金: <span id="money">0</span></p>
 <p>🎯 ラウンド: <span id="round">1</span></p>
-
 <p>🔥 POT: <span id="pot">0</span></p>
 <p>前回結果: <span id="lastResult">---</span></p>
+</div>
 
-<hr>
-
+<div class="card">
 <input id="betAmount" type="number" placeholder="賭け金">
 <button onclick="bet()">ベット</button>
+</div>
 
-<p>⭐ 現在倍率: <span id="previewMultiplier">1.2</span>x</p>
-
-<hr>
-
+<div class="card">
 <h3>借金</h3>
 <input id="loanAmount" type="number" placeholder="借りたい額">
 <button onclick="requestLoan()">借りる</button>
-
 <div id="repayArea"></div>
+</div>
 
-<hr>
-
+<div class="card">
 <h3>参加プレイヤー</h3>
 <div id="playerList"></div>
+</div>
 
 </div>
 
@@ -65,9 +115,9 @@ function joinGame(){
   body:JSON.stringify({name})
  })
  .then(()=>{
+
   currentName=name;
 
-  document.getElementById("displayName").textContent=name;
   document.getElementById("lobby").style.display="none";
   document.getElementById("game").style.display="block";
 
@@ -76,7 +126,7 @@ function joinGame(){
 }
 
 
-// ===== ベット =====
+// ===== BET（減額禁止対応）=====
 function bet(){
 
  const amount=parseInt(
@@ -86,37 +136,44 @@ function bet(){
   method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({name:currentName,amount})
- }).then(()=>loadState());
+ })
+ .then(res=>res.text())
+ .then(data=>{
+
+   if(data.includes("ベット")){
+     alert(data);
+     return;
+   }
+
+   loadState();
+ });
 }
 
 
-// ===== 倍率プレビュー =====
-function calculateMultiplier(amount){
+// ===== 借金 =====
+function requestLoan(){
 
-  if(amount>=500) return 5.0;
-  if(amount>=200) return 3.0;
-  if(amount>=150) return 2.0;
-  if(amount>=100) return 1.9;
-  if(amount>=75) return 1.8;
-  if(amount>=50) return 1.5;
-  if(amount>=20) return 1.4;
+ const input=document.getElementById("loanAmount");
+ const amount=parseInt(input.value);
 
-  return 1.2;
+ if(!amount){
+   alert("金額入力");
+   return;
+ }
+
+ fetch("/loan/request",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({
+    name:currentName,
+    amount:amount
+  })
+ })
+ .then(res=>res.json())
+ .then(data=>{
+   alert("貸し手候補: "+data.lender);
+ });
 }
-
-document.addEventListener("DOMContentLoaded",()=>{
-
-  document.getElementById("betAmount")
-  .addEventListener("input",()=>{
-
-    const amount=parseInt(
-      document.getElementById("betAmount").value)||0;
-
-    document.getElementById("previewMultiplier")
-      .textContent=calculateMultiplier(amount);
-  });
-
-});
 
 
 // ===== 状態更新 =====
@@ -128,20 +185,17 @@ function loadState(){
 
   const money=data.players[currentName];
 
-  document.getElementById("money").textContent=
-    Math.floor(money);
+  document.getElementById("money").textContent=Math.floor(money);
+  document.getElementById("round").textContent=data.round;
 
-  document.getElementById("round").textContent=
-    data.round;
-
-  // POT計算
+  // POT
   let pot=0;
   for(let p in data.bets){
     pot+=data.bets[p];
   }
   document.getElementById("pot").textContent=pot;
 
-  // ===== 前回結果表示 =====
+  // 前回結果
   if(lastMoney!==null && data.round!==lastRound){
 
     const diff=Math.floor(money-lastMoney);
@@ -162,7 +216,7 @@ function loadState(){
   lastMoney=money;
   lastRound=data.round;
 
-  // ===== プレイヤー一覧 =====
+  // プレイヤー一覧
   const list=document.getElementById("playerList");
   list.innerHTML="";
 
@@ -179,7 +233,7 @@ function loadState(){
     }
 
     if(p===currentName){
-      div.style.textDecoration="underline";
+      div.style.border="2px solid #2ecc71";
     }
 
     div.textContent=text;
@@ -189,7 +243,6 @@ function loadState(){
  });
 }
 
-// 自動更新
 setInterval(loadState,2000);
 
 </script>
