@@ -7,9 +7,9 @@
 <style>
 body{
   margin:0;
-  font-family:sans-serif;
   background:#111;
   color:white;
+  font-family:sans-serif;
 }
 
 .container{
@@ -18,42 +18,32 @@ body{
   padding:12px;
 }
 
-h2{
-  text-align:center;
-}
-
 .card{
   background:#1c1c1c;
-  border-radius:12px;
   padding:14px;
+  border-radius:12px;
   margin-bottom:12px;
 }
 
-button{
+input,button{
   width:100%;
   padding:14px;
   font-size:18px;
   border:none;
   border-radius:10px;
-  background:#2ecc71;
-  color:white;
   margin-top:8px;
+  box-sizing:border-box;
 }
 
-input{
-  width:100%;
-  padding:14px;
-  font-size:18px;
-  border-radius:10px;
-  border:none;
-  margin-top:6px;
-  box-sizing:border-box;
+button{
+  background:#2ecc71;
+  color:white;
 }
 
 #playerList div{
   background:#1a1a1a;
-  margin:6px 0;
   padding:10px;
+  margin:6px 0;
   border-radius:8px;
 }
 </style>
@@ -61,31 +51,52 @@ input{
 
 <body>
 
-<h2 id="titleName">プレイヤー</h2>
+<div class="container">
 
 <!-- ロビー -->
-<div id="lobby" class="container">
+<div id="lobby">
+  <h2>参加</h2>
   <input id="playerName" placeholder="名前">
-  <button onclick="joinGame()">参加</button>
+  <button onclick="joinGame()">参加する</button>
 </div>
 
-<!-- ゲーム -->
-<div id="game" class="container" style="display:none;">
+<!-- ゲーム画面 -->
+<div id="game" style="display:none;">
 
 <div class="card">
 <p>💰 所持金: <span id="money">0</span></p>
-<p id="debtLine">💳 借金: なし</p>
-<p>🎯 ラウンド: <span id="round">1</span></p>
-<p>🔥 POT: <span id="pot">0</span></p>
-<p>前回結果: <span id="lastResult">---</span></p>
+<p>💳 借金: <span id="debt">なし</span></p>
 </div>
 
+<!-- ⭐ 信用 -->
 <div class="card">
+<h3>⭐ 信用ポイント</h3>
+
+<p style="text-align:center;">現在の額</p>
+
+<p id="trustValue"
+style="font-size:30px;font-weight:bold;text-align:center;">
+0
+</p>
+
+<p style="text-align:center;">
+通知成功率 :
+<span id="trustChance">0%</span>
+</p>
+
+<button onclick="exchangeTrust()">
+換金（信用30 → 資金回復）
+</button>
+</div>
+
+<!-- BET -->
+<div class="card">
+<h3>BET</h3>
 <input id="betAmount" type="number" placeholder="賭け金">
 <button onclick="bet()">ベット</button>
-<p>⭐ 倍率: <span id="previewMultiplier">1.2</span>x</p>
 </div>
 
+<!-- 借金 -->
 <div class="card">
 <h3>借金</h3>
 <input id="loanAmount" type="number" placeholder="借りたい額">
@@ -99,16 +110,15 @@ input{
 </div>
 
 </div>
+</div>
 
 <script>
 
 let currentName="";
-let lastRound=1;
-let lastMoney=null;
-let loanPopupShown=false;
 
-
-// ===== 参加 =====
+// =================
+// 参加
+// =================
 function joinGame(){
 
  const name=document.getElementById("playerName").value;
@@ -120,15 +130,15 @@ function joinGame(){
  })
  .then(()=>{
   currentName=name;
-  document.getElementById("titleName").textContent=name;
   document.getElementById("lobby").style.display="none";
   document.getElementById("game").style.display="block";
   loadState();
  });
 }
 
-
-// ===== BET =====
+// =================
+// BET
+// =================
 function bet(){
 
  const amount=parseInt(
@@ -139,18 +149,19 @@ function bet(){
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({name:currentName,amount})
  })
- .then(res=>res.text())
- .then(data=>{
-   if(data.includes("ベット")){
-     alert(data);
+ .then(r=>r.text())
+ .then(msg=>{
+   if(msg.includes("不足") || msg.includes("減らせ")){
+     alert(msg);
      return;
    }
    loadState();
  });
 }
 
-
-// ===== 借金申請 =====
+// =================
+// 借金申請
+// =================
 function requestLoan(){
 
  const amount=parseInt(
@@ -161,150 +172,84 @@ function requestLoan(){
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({name:currentName,amount})
  })
- .then(res=>res.json())
+ .then(r=>r.json())
  .then(data=>{
-   alert("貸し手候補: "+data.lender);
+   if(data.failed){
+     alert("信用不足で通知が届かなかった");
+   }else{
+     alert("貸し手："+data.lender);
+   }
  });
 }
 
+// =================
+// 信用換金
+// =================
+function exchangeTrust(){
 
-// ===== 倍率表示 =====
-function calculateMultiplier(amount){
-
-  if(amount>=500) return 5.0;
-  if(amount>=200) return 3.0;
-  if(amount>=150) return 2.0;
-  if(amount>=100) return 1.9;
-  if(amount>=75) return 1.8;
-  if(amount>=50) return 1.5;
-  if(amount>=20) return 1.4;
-
-  return 1.2;
+ fetch("/trust/exchange",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({name:currentName})
+ })
+ .then(r=>r.text())
+ .then(msg=>{
+   if(msg.includes("不足") || msg.includes("できません")){
+     alert(msg);
+     return;
+   }
+   loadState();
+ });
 }
 
-document.addEventListener("DOMContentLoaded",()=>{
-
-  document.getElementById("betAmount")
-  .addEventListener("input",()=>{
-
-    const amount=parseInt(
-      document.getElementById("betAmount").value)||0;
-
-    document.getElementById("previewMultiplier")
-      .textContent=calculateMultiplier(amount);
-  });
-
-});
-
-
-// ===== 状態更新 =====
+// =================
+// 状態更新
+// =================
 function loadState(){
 
  fetch("/state")
- .then(res=>res.json())
+ .then(r=>r.json())
  .then(data=>{
 
-  const money=data.players[currentName];
+  document.getElementById("money")
+    .textContent=Math.floor(data.players[currentName]);
 
-  document.getElementById("money").textContent=Math.floor(money);
-  document.getElementById("round").textContent=data.round;
+  // 借金
+  const loan=data.loans[currentName];
+  document.getElementById("debt")
+    .textContent=loan?loan.amount:"なし";
 
-  // 借金表示
-  const debtLine=document.getElementById("debtLine");
-  if(data.loans[currentName]){
-    debtLine.textContent="💳 借金: "+data.loans[currentName].amount;
-    debtLine.style.color="orange";
-  }else{
-    debtLine.textContent="💳 借金: なし";
-    debtLine.style.color="white";
-  }
+  // ===== 信用 =====
+  const trust=data.trust[currentName]||0;
+  const trustEl=document.getElementById("trustValue");
+  const chanceEl=document.getElementById("trustChance");
 
-  // POT
-  let pot=0;
-  for(let p in data.bets){ pot+=data.bets[p]; }
-  document.getElementById("pot").textContent=pot;
+  trustEl.textContent=trust;
 
-  // 前回結果
-  if(lastMoney!==null && data.round!==lastRound){
+  let chance=0;
+  if(trust>=100) chance=100;
+  else if(trust>=80) chance=80;
+  else if(trust>=70) chance=70;
+  else if(trust>=50) chance=50;
+  else if(trust>=30) chance=30;
+  else if(trust>=10) chance=10;
+  else if(trust>=1) chance=5;
 
-    const diff=Math.floor(money-lastMoney);
-    const result=document.getElementById("lastResult");
+  chanceEl.textContent=chance+"%";
 
-    if(diff>0){
-      result.textContent="+"+diff;
-      result.style.color="lime";
-    }else if(diff<0){
-      result.textContent=diff;
-      result.style.color="red";
-    }else{
-      result.textContent="±0";
-      result.style.color="white";
-    }
-  }
-
-  lastMoney=money;
-  lastRound=data.round;
-
-  // 借金通知
-  if(data.loanRequests[currentName] && !loanPopupShown){
-
-    loanPopupShown=true;
-
-    const req=data.loanRequests[currentName];
-
-    const ok=confirm(
-      `${req.borrower} が ${req.amount} 借りたい\n貸しますか？`
-    );
-
-    fetch(ok?"/loan/accept":"/loan/reject",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({name:currentName})
-    });
-  }
-
-  if(!data.loanRequests[currentName]){
-    loanPopupShown=false;
-  }
-
-  // 返済UI
-  const repayArea=document.getElementById("repayArea");
-  repayArea.innerHTML="";
-
-  if(data.loans[currentName]){
-
-    const loan=data.loans[currentName];
-
-    const btn=document.createElement("button");
-    btn.textContent="全額返済";
-
-    btn.onclick=()=>{
-      fetch("/loan/repay",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:currentName})
-      }).then(()=>loadState());
-    };
-
-    repayArea.appendChild(btn);
-  }
+  if(chance>=80) trustEl.style.color="#2ecc71";
+  else if(chance>=50) trustEl.style.color="#f39c12";
+  else trustEl.style.color="#e74c3c";
 
   // プレイヤー一覧
   const list=document.getElementById("playerList");
   list.innerHTML="";
 
   for(let p in data.players){
-
     const div=document.createElement("div");
-
-    let text=p;
-    if(data.bets[p]) text+=" : BET "+data.bets[p];
-    else text+=" : 待機中";
-
-    if(p===currentName)
-      div.style.border="2px solid #2ecc71";
-
-    div.textContent=text;
+    div.textContent =
+      p+" : "+Math.floor(data.players[p])+
+      (data.bets[p] ? " (BET "+data.bets[p]+")":"");
     list.appendChild(div);
   }
 
