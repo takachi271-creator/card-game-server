@@ -11,20 +11,17 @@ body{
   color:white;
   font-family:sans-serif;
 }
-
 .container{
   max-width:420px;
   margin:auto;
   padding:12px;
 }
-
 .card{
   background:#1c1c1c;
   padding:14px;
   border-radius:12px;
   margin-bottom:12px;
 }
-
 input,button{
   width:100%;
   padding:14px;
@@ -34,17 +31,12 @@ input,button{
   margin-top:8px;
   box-sizing:border-box;
 }
-
 button{
   background:#2ecc71;
   color:white;
 }
-
-#playerList div{
-  background:#1a1a1a;
-  padding:10px;
-  margin:6px 0;
-  border-radius:8px;
+.betActive{
+  border:2px solid #2ecc71;
 }
 </style>
 </head>
@@ -55,12 +47,12 @@ button{
 
 <!-- ロビー -->
 <div id="lobby">
-  <h2>参加</h2>
-  <input id="playerName" placeholder="名前">
-  <button onclick="joinGame()">参加する</button>
+<h2>参加</h2>
+<input id="playerName" placeholder="名前">
+<button onclick="joinGame()">参加</button>
 </div>
 
-<!-- ゲーム画面 -->
+<!-- ゲーム -->
 <div id="game" style="display:none;">
 
 <div class="card">
@@ -68,7 +60,7 @@ button{
 <p>💳 借金: <span id="debt">なし</span></p>
 </div>
 
-<!-- ⭐ 信用 -->
+<!-- 信用 -->
 <div class="card">
 <h3>⭐ 信用ポイント</h3>
 
@@ -116,11 +108,8 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 let currentName="";
 
-// =================
-// 参加
-// =================
+// ===== 参加 =====
 function joinGame(){
-
  const name=document.getElementById("playerName").value;
 
  fetch("/join",{
@@ -130,19 +119,15 @@ function joinGame(){
  })
  .then(()=>{
   currentName=name;
-  document.getElementById("lobby").style.display="none";
-  document.getElementById("game").style.display="block";
+  lobby.style.display="none";
+  game.style.display="block";
   loadState();
  });
 }
 
-// =================
-// BET
-// =================
+// ===== BET =====
 function bet(){
-
- const amount=parseInt(
-   document.getElementById("betAmount").value);
+ const amount=parseInt(betAmount.value);
 
  fetch("/bet",{
   method:"POST",
@@ -151,7 +136,7 @@ function bet(){
  })
  .then(r=>r.text())
  .then(msg=>{
-   if(msg.includes("不足") || msg.includes("減らせ")){
+   if(msg.includes("不足")||msg.includes("減らせ")){
      alert(msg);
      return;
    }
@@ -159,13 +144,9 @@ function bet(){
  });
 }
 
-// =================
-// 借金申請
-// =================
+// ===== 借金 =====
 function requestLoan(){
-
- const amount=parseInt(
-   document.getElementById("loanAmount").value);
+ const amount=parseInt(loanAmount.value);
 
  fetch("/loan/request",{
   method:"POST",
@@ -173,20 +154,14 @@ function requestLoan(){
   body:JSON.stringify({name:currentName,amount})
  })
  .then(r=>r.json())
- .then(data=>{
-   if(data.failed){
-     alert("信用不足で通知が届かなかった");
-   }else{
-     alert("貸し手："+data.lender);
-   }
+ .then(d=>{
+   if(d.failed) alert("信用不足で通知が届かなかった");
+   else alert("貸し手："+d.lender);
  });
 }
 
-// =================
-// 信用換金
-// =================
+// ===== 信用換金 =====
 function exchangeTrust(){
-
  fetch("/trust/exchange",{
   method:"POST",
   headers:{"Content-Type":"application/json"},
@@ -194,7 +169,7 @@ function exchangeTrust(){
  })
  .then(r=>r.text())
  .then(msg=>{
-   if(msg.includes("不足") || msg.includes("できません")){
+   if(msg.includes("不足")||msg.includes("できません")){
      alert(msg);
      return;
    }
@@ -202,29 +177,23 @@ function exchangeTrust(){
  });
 }
 
-// =================
-// 状態更新
-// =================
+// ===== 状態更新 =====
 function loadState(){
 
  fetch("/state")
  .then(r=>r.json())
  .then(data=>{
 
-  document.getElementById("money")
-    .textContent=Math.floor(data.players[currentName]);
+  // 所持金
+  money.textContent=Math.floor(data.players[currentName]);
 
   // 借金
   const loan=data.loans[currentName];
-  document.getElementById("debt")
-    .textContent=loan?loan.amount:"なし";
+  debt.textContent=loan?loan.amount:"なし";
 
   // ===== 信用 =====
   const trust=data.trust[currentName]||0;
-  const trustEl=document.getElementById("trustValue");
-  const chanceEl=document.getElementById("trustChance");
-
-  trustEl.textContent=trust;
+  trustValue.textContent=trust;
 
   let chance=0;
   if(trust>=100) chance=100;
@@ -235,22 +204,61 @@ function loadState(){
   else if(trust>=10) chance=10;
   else if(trust>=1) chance=5;
 
-  chanceEl.textContent=chance+"%";
+  trustChance.textContent=chance+"%";
 
-  if(chance>=80) trustEl.style.color="#2ecc71";
-  else if(chance>=50) trustEl.style.color="#f39c12";
-  else trustEl.style.color="#e74c3c";
+  if(chance>=80) trustValue.style.color="#2ecc71";
+  else if(chance>=50) trustValue.style.color="#f39c12";
+  else trustValue.style.color="#e74c3c";
 
-  // プレイヤー一覧
-  const list=document.getElementById("playerList");
-  list.innerHTML="";
+  // ===== 返済ボタン =====
+  repayArea.innerHTML="";
+  if(loan){
+    const btn=document.createElement("button");
+    btn.textContent="全額返済";
+    btn.onclick=()=>{
+      fetch("/loan/repay",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:currentName})
+      }).then(loadState);
+    };
+    repayArea.appendChild(btn);
+  }
+
+  // ===== 借金通知 =====
+  if(data.loanRequests[currentName]){
+    const req=data.loanRequests[currentName];
+
+    if(confirm(`${req.borrower} が ${req.amount} 借りたい\n貸しますか？`)){
+      fetch("/loan/accept",{method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:currentName})
+      });
+    }else{
+      fetch("/loan/reject",{method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:currentName})
+      });
+    }
+  }
+
+  // ===== プレイヤー一覧 =====
+  playerList.innerHTML="";
 
   for(let p in data.players){
+
     const div=document.createElement("div");
-    div.textContent =
-      p+" : "+Math.floor(data.players[p])+
-      (data.bets[p] ? " (BET "+data.bets[p]+")":"");
-    list.appendChild(div);
+
+    if(data.bets[p]){
+      div.className="betActive";
+      div.textContent=
+        `${p} : ${Math.floor(data.players[p])} (BET ${data.bets[p]})`;
+    }else{
+      div.textContent=
+        `${p} : ${Math.floor(data.players[p])}`;
+    }
+
+    playerList.appendChild(div);
   }
 
  });
