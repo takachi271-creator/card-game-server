@@ -12,7 +12,6 @@ body{
   color:white;
 }
 
-/* ⭐ 横長防止（スマホ最適） */
 .container{
   max-width:420px;
   margin:auto;
@@ -48,6 +47,7 @@ input{
   border-radius:10px;
   border:none;
   margin-top:6px;
+  box-sizing:border-box; /* ⭐ はみ出し防止 */
 }
 
 #playerList div{
@@ -57,12 +57,11 @@ input{
   border-radius:8px;
 }
 </style>
-
 </head>
 
 <body>
 
-<h2>プレイヤー</h2>
+<h2 id="titleName">プレイヤー</h2>
 
 <!-- ロビー -->
 <div id="lobby" class="container">
@@ -83,7 +82,6 @@ input{
 <div class="card">
 <input id="betAmount" type="number" placeholder="賭け金">
 <button onclick="bet()">ベット</button>
-
 <p>⭐ 倍率: <span id="previewMultiplier">1.2</span>x</p>
 </div>
 
@@ -106,6 +104,7 @@ input{
 let currentName="";
 let lastRound=1;
 let lastMoney=null;
+let loanPopupShown=false;
 
 
 // ===== 参加 =====
@@ -120,8 +119,12 @@ function joinGame(){
  })
  .then(()=>{
   currentName=name;
+
+  document.getElementById("titleName").textContent=name;
+
   document.getElementById("lobby").style.display="none";
   document.getElementById("game").style.display="block";
+
   loadState();
  });
 }
@@ -149,7 +152,25 @@ function bet(){
 }
 
 
-// ===== 倍率プレビュー復活 =====
+// ===== 借金申請 =====
+function requestLoan(){
+
+ const amount=parseInt(
+   document.getElementById("loanAmount").value);
+
+ fetch("/loan/request",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({name:currentName,amount})
+ })
+ .then(res=>res.json())
+ .then(data=>{
+   alert("貸し手候補: "+data.lender);
+ });
+}
+
+
+// ===== 倍率表示 =====
 function calculateMultiplier(amount){
 
   if(amount>=500) return 5.0;
@@ -178,24 +199,6 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 
 
-// ===== 借金 =====
-function requestLoan(){
-
- const amount=parseInt(
-   document.getElementById("loanAmount").value);
-
- fetch("/loan/request",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({name:currentName,amount})
- })
- .then(res=>res.json())
- .then(data=>{
-   alert("貸し手候補: "+data.lender);
- });
-}
-
-
 // ===== 状態更新 =====
 function loadState(){
 
@@ -212,6 +215,7 @@ function loadState(){
   for(let p in data.bets){ pot+=data.bets[p]; }
   document.getElementById("pot").textContent=pot;
 
+  // 前回結果
   if(lastMoney!==null && data.round!==lastRound){
 
     const diff=Math.floor(money-lastMoney);
@@ -232,6 +236,29 @@ function loadState(){
   lastMoney=money;
   lastRound=data.round;
 
+  // ===== 借金通知 =====
+  if(data.loanRequests[currentName] && !loanPopupShown){
+
+    loanPopupShown=true;
+
+    const req=data.loanRequests[currentName];
+
+    const ok=confirm(
+      `${req.borrower} が ${req.amount} 借りたい\n貸しますか？`
+    );
+
+    fetch(ok?"/loan/accept":"/loan/reject",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:currentName})
+    });
+  }
+
+  if(!data.loanRequests[currentName]){
+    loanPopupShown=false;
+  }
+
+  // プレイヤー一覧
   const list=document.getElementById("playerList");
   list.innerHTML="";
 
