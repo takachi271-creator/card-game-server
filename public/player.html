@@ -9,16 +9,19 @@
 
 <h2>プレイヤー</h2>
 
+<!-- ===== ロビー ===== -->
 <div id="lobby">
   <input id="playerName" placeholder="名前">
   <button onclick="joinGame()">参加</button>
 </div>
 
+<!-- ===== ゲーム画面 ===== -->
 <div id="game" style="display:none;">
 
 <p>名前: <span id="displayName"></span></p>
-<p>所持金: <span id="money">0</span></p>
-<p>ラウンド: <span id="round">1</span></p>
+<p>💰 所持金: <span id="money">0</span></p>
+<p>🎯 ラウンド: <span id="round">1</span></p>
+<p>💸 利息: <span id="interest">0</span>%</p>
 
 <hr>
 
@@ -33,6 +36,7 @@
 
 <hr>
 
+<h3>参加プレイヤー</h3>
 <div id="playerList"></div>
 
 <pre id="output"></pre>
@@ -43,7 +47,9 @@
 
 let currentName="";
 
+// ===== 参加 =====
 function joinGame(){
+
  const name=document.getElementById("playerName").value;
 
  fetch("/join",{
@@ -63,8 +69,12 @@ function joinGame(){
  });
 }
 
+
+// ===== ベット =====
 function bet(){
- const amount=parseInt(document.getElementById("betAmount").value);
+
+ const amount=parseInt(
+   document.getElementById("betAmount").value);
 
  fetch("/bet",{
   method:"POST",
@@ -73,14 +83,20 @@ function bet(){
  }).then(()=>loadState());
 }
 
+
+// ===== 借金申請 =====
 function requestLoan(){
 
- const amount=parseInt(document.getElementById("loanAmount").value);
+ const amount=parseInt(
+   document.getElementById("loanAmount").value);
 
  fetch("/loan/request",{
   method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({name:currentName,amount})
+  body:JSON.stringify({
+    name:currentName,
+    amount:amount
+  })
  })
  .then(res=>res.json())
  .then(data=>{
@@ -88,19 +104,27 @@ function requestLoan(){
  });
 }
 
+
+// ===== 状態更新 =====
 function loadState(){
 
  fetch("/state")
  .then(res=>res.json())
  .then(data=>{
 
+  // 所持金
   document.getElementById("money").textContent =
     Math.floor(data.players[currentName]);
 
+  // ラウンド
   document.getElementById("round").textContent =
     data.round;
 
-  // ⭐ 借金申請ポップアップ
+  // ⭐ 利息表示
+  document.getElementById("interest").textContent =
+    Math.floor(data.interestRate*100);
+
+  // ===== 借金承認ポップアップ =====
   if(data.loanRequests[currentName]){
     const req=data.loanRequests[currentName];
 
@@ -119,16 +143,33 @@ function loadState(){
     }
   }
 
+  // ===== プレイヤー一覧 =====
   const list=document.getElementById("playerList");
   list.innerHTML="";
 
   for(let p in data.players){
+
     const div=document.createElement("div");
 
+    let text=p;
+
     if(data.bets[p]){
-      div.textContent=p+" : BET "+data.bets[p];
+      text+=" : BET "+data.bets[p];
     }else{
-      div.textContent=p+" : 待機中";
+      text+=" : 待機中";
+    }
+
+    // ⭐ 借金額表示
+    if(data.loans[p]){
+      text+=" | 借金:"+data.loans[p].amount;
+      div.style.color="red";
+      div.style.fontWeight="bold";
+    }
+
+    div.textContent=text;
+
+    if(p===currentName){
+      div.style.textDecoration="underline";
     }
 
     list.appendChild(div);
@@ -137,6 +178,7 @@ function loadState(){
  });
 }
 
+// ⭐ 自動更新
 setInterval(loadState,2000);
 
 </script>
