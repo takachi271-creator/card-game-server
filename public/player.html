@@ -9,13 +9,13 @@
 
 <h2>プレイヤー</h2>
 
-<!-- ===== ロビー ===== -->
+<!-- ロビー -->
 <div id="lobby">
   <input id="playerName" placeholder="名前">
   <button onclick="joinGame()">参加</button>
 </div>
 
-<!-- ===== ゲーム ===== -->
+<!-- ゲーム画面 -->
 <div id="game" style="display:none;">
 
 <p>名前: <span id="displayName"></span></p>
@@ -44,13 +44,28 @@
 <h3>参加プレイヤー</h3>
 <div id="playerList"></div>
 
-<pre id="output"></pre>
-
 </div>
+
+<!-- 勝利エフェクト -->
+<div id="winEffect" style="
+position:fixed;
+top:40%;
+left:50%;
+transform:translate(-50%,-50%);
+font-size:48px;
+font-weight:bold;
+color:gold;
+display:none;
+pointer-events:none;
+z-index:999;
+"></div>
 
 <script>
 
 let currentName="";
+let lastRound=1;
+let lastMoney=0;
+
 
 // ===== 参加 =====
 function joinGame(){
@@ -109,36 +124,34 @@ function requestLoan(){
 }
 
 
-// ===== 倍率計算（プレビュー用）=====
+// ===== 倍率プレビュー =====
 function calculateMultiplier(amount){
 
-  const percent = amount; // startMoney=100基準
+  const percent=amount;
 
-  if(percent >= 500) return 5.0;
-  if(percent >= 200) return 3.0;
-  if(percent >= 150) return 2.0;
-  if(percent >= 100) return 1.9;
-  if(percent >= 75) return 1.8;
-  if(percent >= 50) return 1.5;
-  if(percent >= 20) return 1.4;
+  if(percent>=500) return 5.0;
+  if(percent>=200) return 3.0;
+  if(percent>=150) return 2.0;
+  if(percent>=100) return 1.9;
+  if(percent>=75) return 1.8;
+  if(percent>=50) return 1.5;
+  if(percent>=20) return 1.4;
 
   return 1.2;
 }
 
-
-// ===== 入力時リアル更新 =====
 document.addEventListener("DOMContentLoaded",()=>{
 
   document.getElementById("betAmount")
   .addEventListener("input",()=>{
 
-    const amount =
-      parseInt(document.getElementById("betAmount").value)||0;
+    const amount=parseInt(
+      document.getElementById("betAmount").value)||0;
 
-    const multi = calculateMultiplier(amount);
+    const multi=calculateMultiplier(amount);
 
     document.getElementById("previewMultiplier")
-      .textContent = multi;
+      .textContent=multi;
   });
 
 });
@@ -151,21 +164,43 @@ function loadState(){
  .then(res=>res.json())
  .then(data=>{
 
-  document.getElementById("money").textContent =
-    Math.floor(data.players[currentName]);
+  const money=data.players[currentName];
 
-  document.getElementById("round").textContent =
+  document.getElementById("money").textContent=
+    Math.floor(money);
+
+  document.getElementById("round").textContent=
     data.round;
 
-  document.getElementById("interest").textContent =
+  document.getElementById("interest").textContent=
     Math.floor(data.interestRate*100);
 
-  // POT計算
+  // POT
   let pot=0;
   for(let p in data.bets){
     pot+=data.bets[p];
   }
   document.getElementById("pot").textContent=pot;
+
+  // ===== 勝利エフェクト =====
+  if(lastRound!==data.round){
+
+    const diff=Math.floor(money-lastMoney);
+
+    if(diff>0){
+      const effect=document.getElementById("winEffect");
+      effect.textContent="+"+diff;
+      effect.style.display="block";
+
+      setTimeout(()=>{
+        effect.style.display="none";
+      },2000);
+    }
+
+    lastRound=data.round;
+  }
+
+  lastMoney=money;
 
   // ===== 返済UI =====
   const repayArea=document.getElementById("repayArea");
