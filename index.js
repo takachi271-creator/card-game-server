@@ -1,219 +1,218 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Player</title>
-</head>
+const express = require("express");
+const app = express();
 
-<body>
+app.use(express.json());
+app.use(express.static("public"));
 
-<h2>プレイヤー</h2>
+// ===== デバッグログ =====
+app.use((req,res,next)=>{
+  console.log("API:", req.method, req.url);
+  next();
+});
 
-<!-- ===== ロビー ===== -->
-<div id="lobby">
-  <input id="playerName" placeholder="名前">
-  <button onclick="joinGame()">参加</button>
-</div>
+let game = {
+  players:{},
+  bets:{},
+  loans:{},
+  loanRequests:{},
 
-<!-- ===== ゲーム ===== -->
-<div id="game" style="display:none;">
+  round:1,
 
-<p>名前: <span id="displayName"></span></p>
-<p>💰 所持金: <span id="money">0</span></p>
-<p>🎯 ラウンド: <span id="round">1</span></p>
-<p>🔥 POT: <span id="pot">0</span></p>
-<p>💸 利息: <span id="interest">0</span>%</p>
+  startMoney:100,
+  minBet:5,
+  interestRate:0.05
+};
 
-<hr>
+// =====================
+// 参加
+// =====================
+app.post("/join",(req,res)=>{
+  const {name}=req.body;
 
-<input id="betAmount" type="number" placeholder="賭け金">
-<button onclick="bet()">ベット</button>
+  if(!game.players[name]){
+    game.players[name]=game.startMoney;
+  }
 
-<hr>
-
-<h3>借金</h3>
-<input id="loanAmount" type="number" placeholder="借りたい額">
-<button onclick="requestLoan()">借りる</button>
-
-<!-- ===== 返済 ===== -->
-<div id="repayArea"></div>
-
-<hr>
-
-<h3>参加プレイヤー</h3>
-<div id="playerList"></div>
-
-<pre id="output"></pre>
-
-</div>
-
-<script>
-
-let currentName="";
-
-// ===== 参加 =====
-function joinGame(){
-
- const name=document.getElementById("playerName").value;
-
- fetch("/join",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({name})
- })
- .then(()=>{
-  currentName=name;
-
-  document.getElementById("displayName").textContent=name;
-  document.getElementById("lobby").style.display="none";
-  document.getElementById("game").style.display="block";
-
-  loadState();
- });
-}
+  res.json(game);
+});
 
 
-// ===== ベット =====
-function bet(){
+// =====================
+// ベット
+// =====================
+app.post("/bet",(req,res)=>{
 
- const amount=parseInt(
-   document.getElementById("betAmount").value);
+  const {name,amount}=req.body;
 
- fetch("/bet",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({name:currentName,amount})
- }).then(()=>loadState());
-}
+  if(!game.players[name])
+    return res.send("未参加");
+
+  const debt = game.loans[name]?.amount || 0;
+  const maxBet = game.players[name] + debt;
+
+  if(amount > maxBet)
+    return res.send("賭けすぎ");
+
+  if(amount < game.minBet)
+    return res.send("最低賭け金不足");
+
+  game.bets[name]=amount;
+
+  res.json(game);
+});
 
 
-// ===== 借金申請 =====
-function requestLoan(){
+// =====================
+// 借金申請
+// =====================
+app.post("/loan/request",(req,res)=>{
 
- const amount=parseInt(
-   document.getElementById("loanAmount").value);
+  const {name,amount}=req.body;
 
- fetch("/loan/request",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({
-    name:currentName,
+  const others =
+    Object.keys(game.players)
+      .filter(p=>p!==name);
+
+  if(others.length===0)
+    return res.send("貸す人なし");
+
+  const lender =
+    others[Math.floor(Math.random()*others.length)];
+
+  game.loanRequests[lender]={
+    borrower:name,
     amount:amount
-  })
- })
- .then(res=>res.json())
- .then(data=>{
-   alert("貸し手候補: "+data.lender);
- });
-}
+  };
+
+  res.json({ lender, amount });
+});
 
 
-// ===== 状態更新 =====
-function loadState(){
+// =====================
+// 借金承認
+// =====================
+app.post("/loan/accept",(req,res)=>{
 
- fetch("/state")
- .then(res=>res.json())
- .then(data=>{
+  const {name}=req.body;
 
-  document.getElementById("money").textContent =
-    Math.floor(data.players[currentName]);
+  const reqLoan=game.loanRequests[name];
+  if(!reqLoan) return res.send("申請なし");
 
-  document.getElementById("round").textContent =
-    data.round;
+  const {borrower,amount}=reqLoan;
 
-  document.getElementById("interest").textContent =
-    Math.floor(data.interestRate*100);
+  game.players[name]-=amount;
+  game.players[borrower]+=amount;
 
-  // ⭐ POT計算
-  let pot=0;
-  for(let p in data.bets){
-    pot+=data.bets[p];
+  game.loans[borrower]={
+    lender:name,
+    amount:amount
+  };
+
+  delete game.loanRequests[name];
+
+  res.json(game);
+});
+
+
+// =====================
+// 借金拒否
+// =====================
+app.post("/loan/reject",(req,res)=>{
+  const {name}=req.body;
+  delete game.loanRequests[name];
+  res.json(game);
+});
+
+
+// =====================
+// 全額返済
+// =====================
+app.post("/loan/repay",(req,res)=>{
+
+  const {name}=req.body;
+
+  const loan = game.loans[name];
+  if(!loan) return res.send("借金なし");
+
+  if(game.players[name] < loan.amount)
+    return res.send("所持金不足");
+
+  game.players[name] -= loan.amount;
+  game.players[loan.lender] += loan.amount;
+
+  delete game.loans[name];
+
+  res.json(game);
+});
+
+
+// =====================
+// ⭐ 勝者処理（割合倍率）
+// =====================
+app.post("/winner",(req,res)=>{
+
+  const {name}=req.body;
+
+  let totalPot = 0;
+
+  for(let p in game.bets){
+    totalPot += game.bets[p];
+    game.players[p] -= game.bets[p];
   }
-  document.getElementById("pot").textContent=pot;
 
-  // ===== 借金承認 =====
-  if(data.loanRequests[currentName]){
-    const req=data.loanRequests[currentName];
+  const winnerBet = game.bets[name];
+  const percent =
+    (winnerBet / game.startMoney) * 100;
 
-    if(confirm(req.borrower+" が "+req.amount+" 借りたい\n貸しますか？")){
-      fetch("/loan/accept",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:currentName})
-      });
+  let multiplier = 1.2;
+
+  if(percent >= 500) multiplier = 5.0;
+  else if(percent >= 200) multiplier = 3.0;
+  else if(percent >= 150) multiplier = 2.0;
+  else if(percent >= 100) multiplier = 1.9;
+  else if(percent >= 75) multiplier = 1.8;
+  else if(percent >= 50) multiplier = 1.5;
+  else if(percent >= 20) multiplier = 1.4;
+
+  const reward =
+    Math.floor(totalPot * multiplier);
+
+  game.players[name] += reward;
+
+  // 利息
+  for(let borrower in game.loans){
+
+    const loan = game.loans[borrower];
+    const interest =
+      Math.floor(loan.amount * game.interestRate);
+
+    if(game.players[borrower] >= interest){
+      game.players[borrower]-=interest;
+      game.players[loan.lender]+=interest;
     }else{
-      fetch("/loan/reject",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:currentName})
-      });
+      loan.amount += interest;
     }
   }
 
-  // ===== 返済UI =====
-  const repayArea=document.getElementById("repayArea");
-  repayArea.innerHTML="";
+  game.bets={};
+  game.round++;
 
-  if(data.loans[currentName]){
+  res.json({
+    winner:name,
+    percent:Math.floor(percent),
+    multiplier,
+    pot:totalPot,
+    reward,
+    players:game.players
+  });
+});
 
-    const loan=data.loans[currentName];
 
-    const info=document.createElement("p");
-    info.textContent="借金："+loan.amount;
+// =====================
+app.get("/state",(req,res)=>{
+  res.json(game);
+});
 
-    const btn=document.createElement("button");
-    btn.textContent="全額返済する";
-
-    btn.onclick=()=>{
-      fetch("/loan/repay",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:currentName})
-      }).then(()=>loadState());
-    };
-
-    repayArea.appendChild(info);
-    repayArea.appendChild(btn);
-  }
-
-  // ===== プレイヤー一覧 =====
-  const list=document.getElementById("playerList");
-  list.innerHTML="";
-
-  for(let p in data.players){
-
-    const div=document.createElement("div");
-
-    let text=p;
-
-    if(data.bets[p]){
-      text+=" : BET "+data.bets[p];
-    }else{
-      text+=" : 待機中";
-    }
-
-    if(data.loans[p]){
-      text+=" | 借金:"+data.loans[p].amount;
-      div.style.color="red";
-      div.style.fontWeight="bold";
-    }
-
-    div.textContent=text;
-
-    if(p===currentName){
-      div.style.textDecoration="underline";
-    }
-
-    list.appendChild(div);
-  }
-
- });
-}
-
-// ⭐ 自動更新
-setInterval(loadState,2000);
-
-</script>
-
-</body>
-</html>
+app.listen(3000,()=>{
+  console.log("Server running on port 3000");
+});
