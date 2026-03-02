@@ -12,6 +12,7 @@ let game = {
 
   trust:{},
   lastLoanRound:{},
+  eliminated:{},
 
   round:1,
   startMoney:100,
@@ -22,7 +23,6 @@ let game = {
 // 信用 → 通知成功率
 // =====================
 function getTrustChance(trust){
-
   if(trust >= 100) return 1.0;
   if(trust >= 80) return 0.8;
   if(trust >= 70) return 0.7;
@@ -45,16 +45,20 @@ app.post("/join",(req,res)=>{
 
   game.trust[name]=80;
   game.lastLoanRound[name]=game.round;
+  game.eliminated[name]=false;
 
   res.json(game);
 });
 
 // =====================
-// BET（減額不可）
+// BET
 // =====================
 app.post("/bet",(req,res)=>{
 
   const {name,amount}=req.body;
+
+  if(game.eliminated[name])
+    return res.send("ゲームオーバーです");
 
   if(amount < game.minBet)
     return res.send("最低賭け金不足");
@@ -76,23 +80,25 @@ app.post("/bet",(req,res)=>{
 });
 
 // =====================
-// 借金申請（信用確率）
+// 借金申請
 // =====================
 app.post("/loan/request",(req,res)=>{
 
   const {name,amount}=req.body;
 
+  if(game.eliminated[name])
+    return res.send("ゲームオーバーです");
+
   const others =
-    Object.keys(game.players).filter(p=>p!==name);
+    Object.keys(game.players).filter(p=>p!==name && !game.eliminated[p]);
 
   if(!others.length)
     return res.send("貸し手なし");
 
   const chance = getTrustChance(game.trust[name]);
 
-  if(Math.random() > chance){
+  if(Math.random() > chance)
     return res.json({failed:true});
-  }
 
   const lender =
     others[Math.floor(Math.random()*others.length)];
@@ -107,10 +113,7 @@ app.post("/loan/request",(req,res)=>{
 });
 
 // =====================
-// 借金承認
-// =====================
 app.post("/loan/accept",(req,res)=>{
-
   const {name}=req.body;
   const reqLoan=game.loanRequests[name];
   if(!reqLoan) return res.send("申請なし");
@@ -127,7 +130,6 @@ app.post("/loan/accept",(req,res)=>{
   res.json(game);
 });
 
-// =====================
 app.post("/loan/reject",(req,res)=>{
   const {name}=req.body;
   delete game.loanRequests[name];
@@ -158,19 +160,17 @@ app.post("/loan/repay",(req,res)=>{
 });
 
 // =====================
-// 信用 → お金（BET前のみ）
+// 信用換金（BET前のみ）
 // =====================
 app.post("/trust/exchange",(req,res)=>{
 
   const {name}=req.body;
 
-  if(game.bets[name]){
+  if(game.bets[name])
     return res.send("このターンはもう交換できません");
-  }
 
-  if(game.trust[name] < 30){
+  if(game.trust[name] < 30)
     return res.send("信用不足");
-  }
 
   const gain = Math.floor(game.startMoney * 0.3);
 
@@ -196,21 +196,22 @@ app.post("/winner",(req,res)=>{
 
   game.players[name]+=pot;
 
-  // 未返済ペナルティ
+  // ===== 利息払えない → GAME OVER =====
   for(let borrower in game.loans){
 
     const loan=game.loans[borrower];
+    const interest=Math.floor(loan.amount*0.1);
 
-    if(game.players[borrower] < loan.amount){
-      game.trust[borrower]-=1;
-      game.trust[loan.lender]+=1;
+    if(game.players[borrower] < interest){
+      game.eliminated[borrower]=true;
+      console.log(borrower+" は破産しました");
     }
   }
 
-  // 借金なし5ターン回復
+  // 信用自然回復
   for(let player in game.players){
 
-    if(!game.loans[player]){
+    if(!game.loans[player] && !game.eliminated[player]){
 
       const last=game.lastLoanRound[player] ?? game.round;
 
