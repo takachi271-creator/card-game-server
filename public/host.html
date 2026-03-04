@@ -3,72 +3,105 @@
 <head>
 <meta charset="UTF-8">
 <title>Host</title>
+
+<script src="/socket.io/socket.io.js"></script>
+
 </head>
 
 <body>
 
 <h2>ホスト画面</h2>
 
-<button onclick="loadState()">状態更新</button>
+<p>ラウンド : <span id="round">1</span></p>
 
-<h3>プレイヤー一覧</h3>
+<h3>プレイヤー</h3>
+
 <div id="players"></div>
 
-<hr>
+<h3>BETしているプレイヤー</h3>
 
-<h3>勝者選択（ベットした人のみ）</h3>
-<select id="winnerSelect"></select>
-<button onclick="decideWinner()">勝者決定</button>
-
-<pre id="output"></pre>
+<div id="winnerArea"></div>
 
 <script>
 
-function loadState() {
-  fetch("/state")
-    .then(res => res.json())
-    .then(data => {
+const socket = io();
 
-      document.getElementById("output").textContent =
-        JSON.stringify(data, null, 2);
+function loadState(){
 
-      const playersDiv = document.getElementById("players");
-      const winnerSelect = document.getElementById("winnerSelect");
+fetch("/state")
+.then(r=>r.json())
+.then(data=>{
 
-      playersDiv.innerHTML = "";
-      winnerSelect.innerHTML = "";
+document.getElementById("round").textContent=data.round;
 
-      for (let name in data.players) {
-        const p = document.createElement("p");
-        p.textContent =
-          name + " : " + Math.floor(data.players[name]);
-        playersDiv.appendChild(p);
-      }
+const playersDiv=document.getElementById("players");
+playersDiv.innerHTML="";
 
-      for (let name in data.bets) {
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent =
-          name + " (BET " + data.bets[name] + ")";
-        winnerSelect.appendChild(option);
-      }
-    });
+for(let name in data.players){
+
+const p=document.createElement("p");
+p.textContent=name+" : "+data.players[name];
+
+playersDiv.appendChild(p);
+
 }
 
-function decideWinner() {
+const winnerArea=document.getElementById("winnerArea");
 
-  const name = document.getElementById("winnerSelect").value;
+winnerArea.innerHTML="";
 
-  fetch("/winner", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: name })
-  })
-  .then(res => res.json())
-  .then(() => loadState());
+for(let name in data.bets){
+
+const row=document.createElement("div");
+
+const label=document.createElement("span");
+label.textContent=name+" (BET "+data.bets[name]+") ";
+
+const btn=document.createElement("button");
+btn.textContent="勝者";
+
+btn.onclick=()=>{
+
+const ok=confirm(name+" を勝者にしますか？");
+
+if(!ok) return;
+
+fetch("/winner",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({name})
+})
+.then(res=>res.json())
+.then(loadState);
+
+};
+
+row.appendChild(label);
+row.appendChild(btn);
+
+winnerArea.appendChild(row);
+
 }
 
-setInterval(loadState, 2000);
+});
+
+}
+
+socket.on("turnEnd",(data)=>{
+
+alert(
+"ラウンド終了\n\n"+
+"勝者 : "+data.winner+
+"\n獲得 : "+data.amount
+);
+
+loadState();
+
+});
+
+setInterval(loadState,2000);
 
 </script>
 
