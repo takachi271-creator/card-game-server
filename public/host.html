@@ -1,7 +1,10 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Host</title><style>
+<title>Host</title>
+
+<style>
 
 body{
 background:#111;
@@ -46,15 +49,82 @@ border-bottom:1px solid #333;
 color:#2ecc71;
 }
 
-</style></head><body><div class="container"><h2>ホスト管理</h2><div class="card"><h3>ゲーム設定</h3><p>初期資金</p>
-<input id="setMoney" type="number" value="100"><p>信用初期値</p>
-<input id="setTrust" type="number" value="80"><p>信用換金</p>
+.reset{
+background:#e74c3c;
+}
+
+.roundreset{
+background:#f39c12;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>ホスト管理</h2>
+
+<div class="card">
+
+<h3>ゲーム設定</h3>
+
+<p>初期資金</p>
+<input id="setMoney" type="number" value="100">
+
+<p>信用初期値</p>
+<input id="setTrust" type="number" value="80">
+
+<p>信用換金</p>
 <input id="setTrustCost" type="number" value="30">
 →
-<input id="setTrustRate" type="number" value="0.3" step="0.1"><p>最低BET</p>
-<input id="setMinBet" type="number" value="5"><button onclick="saveSettings()">保存</button>
+<input id="setTrustRate" type="number" value="0.3" step="0.1">
 
-</div><div class="card"><h3>プレイヤー</h3><div id="players"></div></div><div class="card"><h3>BETしている人</h3><div id="betList"></div></div></div><script>
+<p>最低BET</p>
+<input id="setMinBet" type="number" value="5">
+
+<button onclick="saveSettings()">保存</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>プレイヤー</h3>
+
+<div id="players"></div>
+
+</div>
+
+
+<div class="card">
+
+<h3>BETしてる人</h3>
+
+<div id="betList"></div>
+
+</div>
+
+
+<div class="card">
+
+<h3>管理</h3>
+
+<button class="reset" onclick="resetGame()">
+ゲームリセット
+</button>
+
+<button class="roundreset" onclick="resetRound()">
+ラウンドリセット
+</button>
+
+</div>
+
+</div>
+
+
+<script>
 
 function saveSettings(){
 
@@ -156,7 +226,33 @@ body:JSON.stringify({name})
 
 
 
+function resetGame(){
+
+if(!confirm("ゲームをリセットしますか？"))
+return;
+
+fetch("/game/reset",{method:"POST"})
+.then(()=>location.reload());
+
+}
+
+
+
+function resetRound(){
+
+if(!confirm("ラウンドをリセットしますか？"))
+return;
+
+fetch("/round/reset",{method:"POST"})
+.then(loadState);
+
+}
+
+
+
 setInterval(loadState,2000);
 
-</script></body>
+</script>
+
+</body>
 </html>

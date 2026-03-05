@@ -67,25 +67,6 @@ display:none;
 z-index:999;
 }
 
-/* 破産画面 */
-
-#bankruptPage{
-display:none;
-text-align:center;
-padding-top:80px;
-}
-
-#bankruptName{
-font-size:30px;
-margin-bottom:20px;
-}
-
-#bankruptText{
-font-size:26px;
-color:red;
-margin-bottom:40px;
-}
-
 </style>
 </head>
 
@@ -117,9 +98,7 @@ margin-bottom:40px;
 
 <p>💳 借金: <span id="debt">なし</span></p>
 
-<p id="gameOver" style="color:red;font-weight:bold;display:none;">
-GAME OVER
-</p>
+<p>⭐ 信用: <span id="trustValue">0</span></p>
 
 </div>
 
@@ -139,22 +118,10 @@ GAME OVER
 
 <div class="card">
 
-<h3>⭐ 信用ポイント</h3>
-
-<p style="text-align:center;">現在の額</p>
-
-<p id="trustValue"
-style="font-size:30px;font-weight:bold;text-align:center;">
-0
-</p>
-
-<p style="text-align:center;">
-通知成功率 :
-<span id="trustChance">0%</span>
-</p>
+<h3>信用換金</h3>
 
 <button onclick="exchangeTrust()">
-換金（信用30 → 資金回復）
+信用換金
 </button>
 
 </div>
@@ -196,34 +163,6 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 
 </div>
-
-
-<!-- ⭐破産ページ -->
-
-<div id="bankruptPage">
-
-<div id="bankruptName"></div>
-
-<div id="bankruptText">
-破産しました
-</div>
-
-<div class="card">
-
-<p>参加中ゲーム</p>
-
-<button onclick="location.reload()">
-参加
-</button>
-
-<button onclick="watchGame()">
-観戦
-</button>
-
-</div>
-
-</div>
-
 </div>
 
 
@@ -336,24 +275,32 @@ body:JSON.stringify({name:currentName})
 }
 
 
-// ⭐破産通知
+// 借金通知
 
-socket.on("bankrupt",(data)=>{
+socket.on("loanRequest",(data)=>{
 
-if(data.name===currentName){
+if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
 
-document.getElementById("game").style.display="none";
+fetch("/loan/accept",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+});
 
-document.getElementById("bankruptPage").style.display="block";
+}else{
 
-document.getElementById("bankruptName").textContent=currentName;
+fetch("/loan/reject",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+});
 
 }
 
 });
 
 
-// ⭐ターン終了
+// 勝者通知
 
 socket.on("turnEnd",(data)=>{
 
@@ -376,17 +323,6 @@ loadState();
 });
 
 
-// 観戦
-
-function watchGame(){
-
-document.getElementById("bankruptPage").style.display="none";
-
-document.getElementById("game").style.display="block";
-
-}
-
-
 // 状態更新
 
 function loadState(){
@@ -397,11 +333,13 @@ fetch("/state")
 
 .then(data=>{
 
-money.textContent=Math.floor(data.players[currentName]);
+money.textContent=Math.floor(data.players[currentName]||0);
 
 const loan=data.loans[currentName];
 
 debt.textContent=loan?loan.amount:"なし";
+
+trustValue.textContent=data.trust[currentName]||0;
 
 round.textContent=data.round;
 
@@ -412,14 +350,41 @@ for(let p in data.bets){
 pot+=data.bets[p];
 }
 
+pot ? pot : 0;
+
 document.getElementById("pot").textContent=pot;
 
 
 const myBet=data.bets[currentName]||0;
 
 multiplier.textContent=myBet>0
-?calcMultiplier(myBet,data.startMoney)+"x"
+?calcMultiplier(myBet,data.settings.startMoney)+"x"
 :"1.2x";
+
+
+// 返済
+
+repayArea.innerHTML="";
+
+if(loan){
+
+const btn=document.createElement("button");
+
+btn.textContent="全額返済";
+
+btn.onclick=()=>{
+
+fetch("/loan/repay",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+}).then(loadState);
+
+};
+
+repayArea.appendChild(btn);
+
+}
 
 
 // プレイヤー一覧
@@ -445,7 +410,7 @@ playerList.appendChild(div);
 }
 
 
-setInterval(loadState,1000);
+setInterval(loadState,2000);
 
 </script>
 
