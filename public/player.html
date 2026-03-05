@@ -43,6 +43,10 @@ background:#2ecc71;
 color:white;
 }
 
+button:disabled{
+background:#555;
+}
+
 .betActive{
 border:2px solid #2ecc71;
 }
@@ -52,8 +56,6 @@ font-size:22px;
 text-align:center;
 margin-bottom:10px;
 }
-
-/* 勝者表示 */
 
 #winnerPopup{
 position:fixed;
@@ -136,7 +138,7 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 <span id="trustChance">0%</span>
 </p>
 
-<button onclick="exchangeTrust()">
+<button id="exchangeBtn" onclick="exchangeTrust()">
 換金（信用30 → 資金回復）
 </button>
 
@@ -162,7 +164,7 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 <input id="loanAmount" type="number" placeholder="借りたい額">
 
-<button onclick="requestLoan()">借りる</button>
+<button id="loanBtn" onclick="requestLoan()">借りる</button>
 
 <div id="repayArea"></div>
 
@@ -177,7 +179,6 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 </div>
 
-
 </div>
 </div>
 
@@ -187,7 +188,6 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 const socket = io();
 
 let currentName="";
-
 
 function calcMultiplier(amount,startMoney){
 
@@ -207,7 +207,6 @@ return 1.2;
 
 
 // 参加
-
 function joinGame(){
 
 const name=playerName.value;
@@ -236,7 +235,6 @@ loadState();
 
 
 // BET
-
 function bet(){
 
 const amount=parseInt(betAmount.value)||0;
@@ -251,7 +249,6 @@ body:JSON.stringify({name:currentName,amount})
 
 
 // BETしない
-
 function betZero(){
 
 fetch("/bet",{
@@ -264,7 +261,6 @@ body:JSON.stringify({name:currentName,amount:0})
 
 
 // 借金
-
 function requestLoan(){
 
 const amount=parseInt(loanAmount.value);
@@ -273,26 +269,33 @@ fetch("/loan/request",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
+})
+.then(res=>res.text())
+.then(msg=>{
+if(msg) alert(msg);
 });
 
 }
 
 
 // 信用換金
-
 function exchangeTrust(){
 
 fetch("/trust/exchange",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName})
-}).then(loadState);
+})
+.then(res=>res.text())
+.then(msg=>{
+if(msg) alert(msg);
+loadState();
+});
 
 }
 
 
 // 借金通知
-
 socket.on("loanRequest",(data)=>{
 
 if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
@@ -316,8 +319,7 @@ body:JSON.stringify({name:currentName})
 });
 
 
-// ⭐ ターン終了通知
-
+// ターン終了
 socket.on("turnEnd",(data)=>{
 
 const popup=document.getElementById("winnerPopup");
@@ -340,7 +342,6 @@ loadState();
 
 
 // 状態更新
-
 function loadState(){
 
 fetch("/state")
@@ -358,17 +359,16 @@ debt.textContent=loan?loan.amount:"なし";
 round.textContent=data.round;
 
 
+// POT
 let pot=0;
-
 for(let p in data.bets){
 pot+=data.bets[p];
 }
-
-pot ? pot : 0;
-
-document.getElementById("pot").textContent=pot;
+potText=pot;
+document.getElementById("pot").textContent=potText;
 
 
+// 倍率
 const myBet=data.bets[currentName]||0;
 
 multiplier.textContent=myBet>0
@@ -377,18 +377,26 @@ multiplier.textContent=myBet>0
 
 
 // GAME OVER
-
 if(data.eliminated[currentName]){
 gameOver.style.display="block";
 }
 
 
 // 信用
-
 const trust=data.trust[currentName]||0;
 
 trustValue.textContent=trust;
 
+
+// 信用換金ボタン制御
+if(trust<30){
+exchangeBtn.disabled=true;
+}else{
+exchangeBtn.disabled=false;
+}
+
+
+// 成功率
 let chance=0;
 
 if(trust>=100) chance=100;
@@ -401,13 +409,16 @@ else if(trust>=1) chance=5;
 
 trustChance.textContent=chance+"%";
 
-if(chance>=80) trustValue.style.color="#2ecc71";
-else if(chance>=50) trustValue.style.color="#f39c12";
-else trustValue.style.color="#e74c3c";
+
+// 借金制御
+if(loan){
+loanBtn.disabled=true;
+}else{
+loanBtn.disabled=false;
+}
 
 
 // 返済
-
 repayArea.innerHTML="";
 
 if(loan){
@@ -432,7 +443,6 @@ repayArea.appendChild(btn);
 
 
 // プレイヤー一覧
-
 playerList.innerHTML="";
 
 for(let p in data.players){
