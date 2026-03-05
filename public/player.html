@@ -67,6 +67,11 @@ display:none;
 z-index:999;
 }
 
+.loanLocked{
+opacity:0.5;
+pointer-events:none;
+}
+
 </style>
 </head>
 
@@ -113,6 +118,12 @@ z-index:999;
 
 <p>現在倍率 : <span id="multiplier">1.2x</span></p>
 
+<p>最低BET : <span id="minBet">0</span></p>
+
+<p>借金成功率 : <span id="loanChance">0%</span></p>
+
+<p>信用換金 : <span id="exchangeText">30 → +30</span></p>
+
 </div>
 
 
@@ -121,7 +132,7 @@ z-index:999;
 <h3>信用換金</h3>
 
 <button onclick="exchangeTrust()">
-信用換金
+換金
 </button>
 
 </div>
@@ -140,7 +151,7 @@ z-index:999;
 </div>
 
 
-<div class="card">
+<div id="loanCard" class="card">
 
 <h3>借金</h3>
 
@@ -190,6 +201,21 @@ return 1.2;
 }
 
 
+function calcLoanChance(trust){
+
+if(trust>=100) return 100;
+if(trust>=80) return 80;
+if(trust>=70) return 70;
+if(trust>=50) return 50;
+if(trust>=30) return 30;
+if(trust>=10) return 10;
+if(trust>=1) return 5;
+
+return 0;
+
+}
+
+
 // 参加
 
 function joinGame(){
@@ -234,8 +260,6 @@ body:JSON.stringify({name:currentName,amount})
 }
 
 
-// BETしない
-
 function betZero(){
 
 fetch("/bet",{
@@ -257,6 +281,14 @@ fetch("/loan/request",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
+})
+.then(r=>r.text())
+.then(msg=>{
+
+if(msg==="通知失敗"){
+alert("借金通知に失敗しました");
+}
+
 });
 
 }
@@ -339,10 +371,16 @@ const loan=data.loans[currentName];
 
 debt.textContent=loan?loan.amount:"なし";
 
-trustValue.textContent=data.trust[currentName]||0;
+const trust=data.trust[currentName]||0;
+
+trustValue.textContent=trust;
 
 round.textContent=data.round;
 
+minBet.textContent=data.settings.minBet;
+
+
+// POT
 
 let pot=0;
 
@@ -355,11 +393,44 @@ pot ? pot : 0;
 document.getElementById("pot").textContent=pot;
 
 
+// 倍率
+
 const myBet=data.bets[currentName]||0;
 
 multiplier.textContent=myBet>0
 ?calcMultiplier(myBet,data.settings.startMoney)+"x"
 :"1.2x";
+
+
+// 借金成功率
+
+loanChance.textContent=
+calcLoanChance(trust)+"%";
+
+
+// 信用換金表示
+
+const gain=
+Math.floor(
+data.settings.startMoney*
+data.settings.trustExchangeRate
+);
+
+exchangeText.textContent=
+data.settings.trustExchangeCost+
+" → +"+
+gain;
+
+
+// 借金UI
+
+const loanCard=document.getElementById("loanCard");
+
+if(loan){
+loanCard.classList.add("loanLocked");
+}else{
+loanCard.classList.remove("loanLocked");
+}
 
 
 // 返済
