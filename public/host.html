@@ -4,104 +4,76 @@
 <meta charset="UTF-8">
 <title>Host</title>
 
-<script src="/socket.io/socket.io.js"></script>
+<style>
 
+body{
+background:#111;
+color:white;
+font-family:sans-serif;
+text-align:center;
+}
+
+input,button{
+padding:10px;
+margin:6px;
+font-size:18px;
+}
+
+</style>
 </head>
 
 <body>
 
-<h2>ホスト画面</h2>
+<h2>ホスト管理</h2>
 
-<p>ラウンド : <span id="round">1</span></p>
+<h3>ゲーム設定</h3>
 
-<h3>プレイヤー</h3>
+<p>初期資金</p>
+<input id="setMoney" type="number" value="100">
 
-<div id="players"></div>
+<p>信用初期値</p>
+<input id="setTrust" type="number" value="80">
 
-<h3>BETしているプレイヤー</h3>
+<p>信用換金</p>
+<input id="setTrustCost" type="number" value="30">
+→
+<input id="setTrustRate" type="number" value="0.3">
 
-<div id="winnerArea"></div>
+<p>最低BET</p>
+<input id="setMinBet" type="number" value="5">
+
+<br><br>
+
+<button onclick="saveSettings()">
+保存
+</button>
 
 <script>
 
-const socket = io();
+function saveSettings(){
 
-function loadState(){
+fetch("/settings/update",{
 
-fetch("/state")
-.then(r=>r.json())
-.then(data=>{
-
-document.getElementById("round").textContent=data.round;
-
-const playersDiv=document.getElementById("players");
-playersDiv.innerHTML="";
-
-for(let name in data.players){
-
-const p=document.createElement("p");
-p.textContent=name+" : "+data.players[name];
-
-playersDiv.appendChild(p);
-
-}
-
-const winnerArea=document.getElementById("winnerArea");
-
-winnerArea.innerHTML="";
-
-for(let name in data.bets){
-
-const row=document.createElement("div");
-
-const label=document.createElement("span");
-label.textContent=name+" (BET "+data.bets[name]+") ";
-
-const btn=document.createElement("button");
-btn.textContent="勝者";
-
-btn.onclick=()=>{
-
-const ok=confirm(name+" を勝者にしますか？");
-
-if(!ok) return;
-
-fetch("/winner",{
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
-body:JSON.stringify({name})
+
+body:JSON.stringify({
+
+startMoney:parseInt(setMoney.value),
+startTrust:parseInt(setTrust.value),
+trustExchangeCost:parseInt(setTrustCost.value),
+trustExchangeRate:parseFloat(setTrustRate.value),
+minBet:parseInt(setMinBet.value)
+
 })
-.then(res=>res.json())
-.then(loadState);
 
-};
-
-row.appendChild(label);
-row.appendChild(btn);
-
-winnerArea.appendChild(row);
+})
+.then(()=>alert("保存しました"))
 
 }
-
-});
-
-}
-
-socket.on("turnEnd",(data)=>{
-
-alert(
-"ラウンド終了\n\n"+
-"勝者 : "+data.winner+
-"\n獲得 : "+data.amount
-);
-
-loadState();
-
-});
-
-setInterval(loadState,2000);
 
 </script>
 
