@@ -43,10 +43,6 @@ background:#2ecc71;
 color:white;
 }
 
-button:disabled{
-background:#555;
-}
-
 .betActive{
 border:2px solid #2ecc71;
 }
@@ -69,6 +65,25 @@ text-align:center;
 font-size:28px;
 display:none;
 z-index:999;
+}
+
+/* 破産画面 */
+
+#bankruptPage{
+display:none;
+text-align:center;
+padding-top:80px;
+}
+
+#bankruptName{
+font-size:30px;
+margin-bottom:20px;
+}
+
+#bankruptText{
+font-size:26px;
+color:red;
+margin-bottom:40px;
 }
 
 </style>
@@ -138,7 +153,7 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 <span id="trustChance">0%</span>
 </p>
 
-<button id="exchangeBtn" onclick="exchangeTrust()">
+<button onclick="exchangeTrust()">
 換金（信用30 → 資金回復）
 </button>
 
@@ -164,7 +179,7 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 <input id="loanAmount" type="number" placeholder="借りたい額">
 
-<button id="loanBtn" onclick="requestLoan()">借りる</button>
+<button onclick="requestLoan()">借りる</button>
 
 <div id="repayArea"></div>
 
@@ -179,7 +194,36 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 </div>
 
+
 </div>
+
+
+<!-- ⭐破産ページ -->
+
+<div id="bankruptPage">
+
+<div id="bankruptName"></div>
+
+<div id="bankruptText">
+破産しました
+</div>
+
+<div class="card">
+
+<p>参加中ゲーム</p>
+
+<button onclick="location.reload()">
+参加
+</button>
+
+<button onclick="watchGame()">
+観戦
+</button>
+
+</div>
+
+</div>
+
 </div>
 
 
@@ -188,6 +232,7 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 const socket = io();
 
 let currentName="";
+
 
 function calcMultiplier(amount,startMoney){
 
@@ -207,6 +252,7 @@ return 1.2;
 
 
 // 参加
+
 function joinGame(){
 
 const name=playerName.value;
@@ -235,6 +281,7 @@ loadState();
 
 
 // BET
+
 function bet(){
 
 const amount=parseInt(betAmount.value)||0;
@@ -249,6 +296,7 @@ body:JSON.stringify({name:currentName,amount})
 
 
 // BETしない
+
 function betZero(){
 
 fetch("/bet",{
@@ -261,6 +309,7 @@ body:JSON.stringify({name:currentName,amount:0})
 
 
 // 借金
+
 function requestLoan(){
 
 const amount=parseInt(loanAmount.value);
@@ -269,57 +318,43 @@ fetch("/loan/request",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
-})
-.then(res=>res.text())
-.then(msg=>{
-if(msg) alert(msg);
 });
 
 }
 
 
 // 信用換金
+
 function exchangeTrust(){
 
 fetch("/trust/exchange",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName})
-})
-.then(res=>res.text())
-.then(msg=>{
-if(msg) alert(msg);
-loadState();
-});
+}).then(loadState);
 
 }
 
 
-// 借金通知
-socket.on("loanRequest",(data)=>{
+// ⭐破産通知
 
-if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
+socket.on("bankrupt",(data)=>{
 
-fetch("/loan/accept",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-});
+if(data.name===currentName){
 
-}else{
+document.getElementById("game").style.display="none";
 
-fetch("/loan/reject",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-});
+document.getElementById("bankruptPage").style.display="block";
+
+document.getElementById("bankruptName").textContent=currentName;
 
 }
 
 });
 
 
-// ターン終了
+// ⭐ターン終了
+
 socket.on("turnEnd",(data)=>{
 
 const popup=document.getElementById("winnerPopup");
@@ -341,7 +376,19 @@ loadState();
 });
 
 
+// 観戦
+
+function watchGame(){
+
+document.getElementById("bankruptPage").style.display="none";
+
+document.getElementById("game").style.display="block";
+
+}
+
+
 // 状態更新
+
 function loadState(){
 
 fetch("/state")
@@ -359,16 +406,15 @@ debt.textContent=loan?loan.amount:"なし";
 round.textContent=data.round;
 
 
-// POT
 let pot=0;
+
 for(let p in data.bets){
 pot+=data.bets[p];
 }
-potText=pot;
-document.getElementById("pot").textContent=potText;
+
+document.getElementById("pot").textContent=pot;
 
 
-// 倍率
 const myBet=data.bets[currentName]||0;
 
 multiplier.textContent=myBet>0
@@ -376,73 +422,8 @@ multiplier.textContent=myBet>0
 :"1.2x";
 
 
-// GAME OVER
-if(data.eliminated[currentName]){
-gameOver.style.display="block";
-}
-
-
-// 信用
-const trust=data.trust[currentName]||0;
-
-trustValue.textContent=trust;
-
-
-// 信用換金ボタン制御
-if(trust<30){
-exchangeBtn.disabled=true;
-}else{
-exchangeBtn.disabled=false;
-}
-
-
-// 成功率
-let chance=0;
-
-if(trust>=100) chance=100;
-else if(trust>=80) chance=80;
-else if(trust>=70) chance=70;
-else if(trust>=50) chance=50;
-else if(trust>=30) chance=30;
-else if(trust>=10) chance=10;
-else if(trust>=1) chance=5;
-
-trustChance.textContent=chance+"%";
-
-
-// 借金制御
-if(loan){
-loanBtn.disabled=true;
-}else{
-loanBtn.disabled=false;
-}
-
-
-// 返済
-repayArea.innerHTML="";
-
-if(loan){
-
-const btn=document.createElement("button");
-
-btn.textContent="全額返済";
-
-btn.onclick=()=>{
-
-fetch("/loan/repay",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-}).then(loadState);
-
-};
-
-repayArea.appendChild(btn);
-
-}
-
-
 // プレイヤー一覧
+
 playerList.innerHTML="";
 
 for(let p in data.players){
