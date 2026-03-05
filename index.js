@@ -39,7 +39,10 @@ io.on("connection",(socket)=>{
 });
 
 
+// =================
 // プレイヤー参加
+// =================
+
 app.post("/join",(req,res)=>{
 
   const {name}=req.body;
@@ -47,7 +50,10 @@ app.post("/join",(req,res)=>{
   if(!game.players[name]){
 
     game.players[name]=game.settings.startMoney;
+
+    // ⭐ 信用値必ず初期化
     game.trust[name]=game.settings.startTrust;
+
     game.eliminated[name]=false;
 
   }
@@ -57,7 +63,10 @@ app.post("/join",(req,res)=>{
 });
 
 
+// =================
 // BET
+// =================
+
 app.post("/bet",(req,res)=>{
 
   const {name,amount}=req.body;
@@ -65,11 +74,11 @@ app.post("/bet",(req,res)=>{
   if(game.eliminated[name])
     return res.send("破産しています");
 
-  if(amount !== 0 && amount < game.settings.minBet)
+  if(amount!==0 && amount < game.settings.minBet)
     return res.send("最低BET未満");
 
   if(amount > game.players[name])
-    return res.send("所持金以上BETできません");
+    return res.send("所持金不足");
 
   const currentBet = game.bets[name] || 0;
 
@@ -83,13 +92,19 @@ app.post("/bet",(req,res)=>{
 });
 
 
+// =================
 // 借金申請
+// =================
+
 app.post("/loan/request",(req,res)=>{
 
   const {name,amount}=req.body;
 
   if(game.loans[name])
     return res.send("借金返済後に借りてください");
+
+  if(amount<=0)
+    return res.send("金額エラー");
 
   const players =
   Object.keys(game.players).filter(p=>p!==name);
@@ -111,7 +126,10 @@ app.post("/loan/request",(req,res)=>{
 });
 
 
+// =================
 // 借金承認
+// =================
+
 app.post("/loan/accept",(req,res)=>{
 
   const {name}=req.body;
@@ -140,7 +158,25 @@ app.post("/loan/accept",(req,res)=>{
 });
 
 
+// =================
+// 借金拒否
+// =================
+
+app.post("/loan/reject",(req,res)=>{
+
+  const {name}=req.body;
+
+  delete game.loanRequests[name];
+
+  res.json(game);
+
+});
+
+
+// =================
 // 借金返済
+// =================
+
 app.post("/loan/repay",(req,res)=>{
 
   const {name}=req.body;
@@ -164,7 +200,10 @@ app.post("/loan/repay",(req,res)=>{
 });
 
 
+// =================
 // 信用換金
+// =================
+
 app.post("/trust/exchange",(req,res)=>{
 
   const {name}=req.body;
@@ -186,7 +225,10 @@ app.post("/trust/exchange",(req,res)=>{
 });
 
 
-// 勝者決定
+// =================
+// 勝者処理
+// =================
+
 app.post("/winner",(req,res)=>{
 
   const {name}=req.body;
@@ -199,13 +241,14 @@ app.post("/winner",(req,res)=>{
   for(let p in game.bets){
 
     pot+=game.bets[p];
+
     game.players[p]-=game.bets[p];
 
   }
 
   game.players[name]+=pot;
 
-  // 破産判定
+  // ⭐破産判定
   for(let p in game.players){
 
     const debt =
@@ -237,7 +280,10 @@ app.post("/winner",(req,res)=>{
 });
 
 
-// ⭐ホスト設定更新
+// =================
+// 設定変更
+// =================
+
 app.post("/settings/update",(req,res)=>{
 
   const {
@@ -259,8 +305,25 @@ app.post("/settings/update",(req,res)=>{
 });
 
 
+// =================
+// 状態
+// =================
+
 app.get("/state",(req,res)=>{
+
+  // ⭐ 信用値未設定防止
+  for(let p in game.players){
+
+    if(game.trust[p]===undefined){
+
+      game.trust[p]=game.settings.startTrust;
+
+    }
+
+  }
+
   res.json(game);
+
 });
 
 

@@ -1,54 +1,60 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html>
 <head>
 <meta charset="UTF-8">
-<title>Host</title>
-
-<style>
+<title>Host</title><style>
 
 body{
 background:#111;
 color:white;
 font-family:sans-serif;
-text-align:center;
+margin:0;
+padding:20px;
+}
+
+.container{
+max-width:420px;
+margin:auto;
+}
+
+.card{
+background:#1c1c1c;
+padding:16px;
+border-radius:12px;
+margin-bottom:12px;
 }
 
 input,button{
-padding:10px;
-margin:6px;
-font-size:18px;
+width:100%;
+padding:12px;
+margin-top:8px;
+font-size:16px;
+border:none;
+border-radius:8px;
 }
 
-</style>
-</head>
+button{
+background:#2ecc71;
+color:white;
+}
 
-<body>
+.player{
+padding:8px;
+border-bottom:1px solid #333;
+}
 
-<h2>ホスト管理</h2>
+.bet{
+color:#2ecc71;
+}
 
-<h3>ゲーム設定</h3>
-
-<p>初期資金</p>
-<input id="setMoney" type="number" value="100">
-
-<p>信用初期値</p>
-<input id="setTrust" type="number" value="80">
-
-<p>信用換金</p>
+</style></head><body><div class="container"><h2>ホスト管理</h2><div class="card"><h3>ゲーム設定</h3><p>初期資金</p>
+<input id="setMoney" type="number" value="100"><p>信用初期値</p>
+<input id="setTrust" type="number" value="80"><p>信用換金</p>
 <input id="setTrustCost" type="number" value="30">
 →
-<input id="setTrustRate" type="number" value="0.3">
+<input id="setTrustRate" type="number" value="0.3" step="0.1"><p>最低BET</p>
+<input id="setMinBet" type="number" value="5"><button onclick="saveSettings()">保存</button>
 
-<p>最低BET</p>
-<input id="setMinBet" type="number" value="5">
-
-<br><br>
-
-<button onclick="saveSettings()">
-保存
-</button>
-
-<script>
+</div><div class="card"><h3>プレイヤー</h3><div id="players"></div></div><div class="card"><h3>BETしている人</h3><div id="betList"></div></div></div><script>
 
 function saveSettings(){
 
@@ -71,11 +77,86 @@ minBet:parseInt(setMinBet.value)
 })
 
 })
-.then(()=>alert("保存しました"))
+.then(()=>alert("設定保存"));
 
 }
 
-</script>
 
-</body>
+
+function loadState(){
+
+fetch("/state")
+.then(r=>r.json())
+.then(data=>{
+
+const playersDiv=document.getElementById("players");
+const betDiv=document.getElementById("betList");
+
+playersDiv.innerHTML="";
+betDiv.innerHTML="";
+
+
+for(let p in data.players){
+
+const div=document.createElement("div");
+
+div.className="player";
+
+div.textContent=
+p+" : "+
+Math.floor(data.players[p])+
+" / 信用 "+
+(data.trust[p]||0);
+
+playersDiv.appendChild(div);
+
+}
+
+
+
+for(let p in data.bets){
+
+const row=document.createElement("div");
+
+row.className="player bet";
+
+row.innerHTML=
+
+p+" (BET "+data.bets[p]+") "+
+'<button onclick="winner(\''+p+'\')">勝者</button>';
+
+betDiv.appendChild(row);
+
+}
+
+});
+
+}
+
+
+
+function winner(name){
+
+if(!confirm(name+" を勝者にしますか？"))
+return;
+
+fetch("/winner",{
+
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
+}
+
+
+
+setInterval(loadState,2000);
+
+</script></body>
 </html>
