@@ -11,43 +11,19 @@ background:#111;
 color:white;
 font-family:sans-serif;
 text-align:center;
-margin:0;
 }
 
 .card{
 background:#1c1c1c;
-margin:12px;
 padding:14px;
+margin:12px;
 border-radius:12px;
 }
 
 button,input{
 padding:10px;
-font-size:16px;
 margin:6px;
-border:none;
-border-radius:8px;
-}
-
-button{
-background:#2ecc71;
-color:white;
-}
-
-#qrPopup{
-position:fixed;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:#000;
-padding:25px;
-border-radius:14px;
-display:none;
-z-index:999;
-}
-
-#qrcode{
-margin:10px;
+font-size:16px;
 }
 
 </style>
@@ -58,7 +34,6 @@ margin:10px;
 
 <h2>ホスト管理</h2>
 
-
 <div class="card">
 
 <h3>プレイヤー</h3>
@@ -67,14 +42,12 @@ margin:10px;
 
 <input id="newPlayerName" placeholder="名前">
 
-<button onclick="addPlayer()">プレイヤーを追加</button>
+<button onclick="addPlayer()">追加</button>
 
 </div>
 
 
 <div class="card">
-
-<h3>ゲーム状況</h3>
 
 <p>ラウンド : <span id="round"></span></p>
 
@@ -91,6 +64,30 @@ margin:10px;
 
 <div class="card">
 
+<h3>ゲーム設定</h3>
+
+初期資金<br>
+<input id="startMoney"><br>
+
+信用初期値<br>
+<input id="trustStart"><br>
+
+信用換金コスト<br>
+<input id="trustCost"><br>
+
+信用換金％<br>
+<input id="trustPercent"><br>
+
+最低BET<br>
+<input id="minBet"><br>
+
+<button onclick="saveSettings()">保存</button>
+
+</div>
+
+
+<div class="card">
+
 <h3>BETプレイヤー</h3>
 
 <div id="bets"></div>
@@ -98,34 +95,7 @@ margin:10px;
 </div>
 
 
-<div class="card">
-
-<button onclick="resetGame()">ゲームリセット</button>
-
-</div>
-
-
-<div id="qrPopup">
-
-<h3 id="qrTitle"></h3>
-
-<div id="qrcode"></div>
-
-<p id="qrUrl"></p>
-
-<button onclick="copyURL()">URLコピー</button>
-
-<br>
-
-<button onclick="closeQR()">閉じる</button>
-
-</div>
-
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
 <script>
-
 
 function loadState(){
 
@@ -133,29 +103,19 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
-
 round.textContent=data.round;
-
-
-/* POT */
 
 let pot=0;
 
-for(let p in data.bets){
+for(let p in data.bets)
 pot+=data.bets[p];
-}
 
-pot ? pot : 0;
+pot?pot:0;
 
 document.getElementById("pot").textContent=pot;
 
-
-/* BET状態 */
-
 betState.textContent=data.betEnabled?"可能":"不可能";
 
-
-/* プレイヤー一覧 */
 
 players.innerHTML="";
 
@@ -165,23 +125,12 @@ const div=document.createElement("div");
 
 const online=data.online[p];
 
-const qrBtn=document.createElement("button");
-
-qrBtn.textContent="QRを表示";
-
-qrBtn.onclick=()=>showQR(p);
-
-
-div.textContent=p+" "+(online?"🟢":"🔴")+" ";
-
-div.appendChild(qrBtn);
+div.textContent=p+" "+(online?"🟢":"🔴");
 
 players.appendChild(div);
 
 }
 
-
-/* BET一覧 */
 
 bets.innerHTML="";
 
@@ -211,79 +160,28 @@ bets.appendChild(div);
 
 }
 
+
+startMoney.value=data.startMoney;
+trustStart.value=data.trustStart;
+trustCost.value=data.trustCost;
+trustPercent.value=data.trustPercent;
+minBet.value=data.minBet;
+
 });
 
 }
 
-
-/* QR表示 */
-
-function showQR(name){
-
-const url =
-window.location.origin +
-"/player.html?name=" +
-encodeURIComponent(name);
-
-document.getElementById("qrTitle").textContent =
-name+" の参加QR";
-
-document.getElementById("qrUrl").textContent=url;
-
-const qr=document.getElementById("qrcode");
-
-qr.innerHTML="";
-
-new QRCode(qr,{
-text:url,
-width:200,
-height:200
-});
-
-document.getElementById("qrPopup").style.display="block";
-
-}
-
-
-/* QR閉じる */
-
-function closeQR(){
-
-document.getElementById("qrPopup").style.display="none";
-
-}
-
-
-/* URLコピー */
-
-function copyURL(){
-
-const text=document.getElementById("qrUrl").textContent;
-
-navigator.clipboard.writeText(text);
-
-alert("URLコピーしました");
-
-}
-
-
-/* プレイヤー追加 */
 
 function addPlayer(){
-
-const name=newPlayerName.value;
 
 fetch("/player/add",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name})
-})
-.then(loadState);
+body:JSON.stringify({name:newPlayerName.value})
+}).then(loadState);
 
 }
 
-
-/* BET切替 */
 
 function toggleBet(){
 
@@ -292,11 +190,21 @@ fetch("/bet/toggle",{method:"POST"});
 }
 
 
-/* リセット */
+function saveSettings(){
 
-function resetGame(){
+fetch("/settings",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
 
-fetch("/reset",{method:"POST"});
+startMoney:startMoney.value,
+trustStart:trustStart.value,
+trustCost:trustCost.value,
+trustPercent:trustPercent.value,
+minBet:minBet.value
+
+})
+});
 
 }
 
