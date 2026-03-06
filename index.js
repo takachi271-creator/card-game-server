@@ -23,6 +23,9 @@ loanRequests:{},
 trust:{},
 eliminated:{},
 
+allowedPlayers:[],
+online:{},
+
 startMoney:100,
 minBet:5,
 
@@ -36,9 +39,33 @@ betEnabled:true
 };
 
 io.on("connection",(socket)=>{
+
 socket.on("register",(name)=>{
+
 sockets[name]=socket;
+game.online[name]=true;
+
+socket.on("disconnect",()=>{
+game.online[name]=false;
 });
+
+});
+
+});
+
+
+/* プレイヤー追加 */
+
+app.post("/player/add",(req,res)=>{
+
+const {name}=req.body;
+
+if(!game.allowedPlayers.includes(name)){
+game.allowedPlayers.push(name);
+}
+
+res.json(game);
+
 });
 
 
@@ -47,6 +74,10 @@ sockets[name]=socket;
 app.post("/join",(req,res)=>{
 
 const {name}=req.body;
+
+if(!game.allowedPlayers.includes(name)){
+return res.send("登録されていません");
+}
 
 if(!game.players[name]){
 
@@ -92,7 +123,7 @@ res.json(game);
 });
 
 
-/* BET受付切替 */
+/* BET切替 */
 
 app.post("/bet/toggle",(req,res)=>{
 
@@ -232,7 +263,7 @@ game.players[p]-=game.bets[p];
 game.players[name]+=pot;
 
 
-/* BET履歴 */
+/* 履歴 */
 
 for(let p in game.bets){
 
@@ -303,6 +334,7 @@ game.loans={};
 game.loanRequests={};
 game.trust={};
 game.eliminated={};
+game.online={};
 game.round=1;
 
 res.json(game);
