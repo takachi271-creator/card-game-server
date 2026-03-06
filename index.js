@@ -196,6 +196,25 @@ app.post("/trust/exchange",(req,res)=>{
 
 });
 
+app.post("/reset",(req,res)=>{
+
+game = {
+  players:{},
+  bets:{},
+  betHistory:{},
+  loans:{},
+  loanRequests:{},
+  trust:{},
+  eliminated:{},
+  startMoney:100,
+  minBet:5,
+  round:1
+};
+
+res.json(game);
+
+});
+
 app.post("/winner",(req,res)=>{
 
   const {name}=req.body;

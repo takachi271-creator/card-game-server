@@ -11,28 +11,29 @@ background:#111;
 color:white;
 font-family:sans-serif;
 margin:0;
-padding:20px;
 }
 
 .container{
-max-width:420px;
+max-width:500px;
 margin:auto;
+padding:15px;
 }
 
 .card{
 background:#1c1c1c;
-padding:16px;
+padding:15px;
 border-radius:12px;
 margin-bottom:12px;
 }
 
-input,button{
+button,input{
 width:100%;
 padding:12px;
-margin-top:8px;
 font-size:16px;
+margin-top:8px;
 border:none;
 border-radius:8px;
+box-sizing:border-box;
 }
 
 button{
@@ -41,20 +42,22 @@ color:white;
 }
 
 .player{
-padding:8px;
+padding:6px;
 border-bottom:1px solid #333;
 }
 
-.bet{
+.betPlayer{
 color:#2ecc71;
+font-weight:bold;
 }
 
-.reset{
+.winnerBtn{
+background:#3498db;
+margin-top:5px;
+}
+
+.danger{
 background:#e74c3c;
-}
-
-.roundreset{
-background:#f39c12;
 }
 
 </style>
@@ -70,19 +73,20 @@ background:#f39c12;
 
 <h3>ゲーム設定</h3>
 
-<p>初期資金</p>
-<input id="setMoney" type="number" value="100">
+初期資金
+<input id="startMoney" type="number" value="100">
 
-<p>信用初期値</p>
-<input id="setTrust" type="number" value="80">
+信用初期値
+<input id="trustStart" type="number" value="80">
 
-<p>信用換金</p>
-<input id="setTrustCost" type="number" value="30">
-→
-<input id="setTrustRate" type="number" value="0.3" step="0.1">
+信用換金
+<input id="trustCost" type="number" value="30">
 
-<p>最低BET</p>
-<input id="setMinBet" type="number" value="5">
+換金率 %
+<input id="trustPercent" type="number" step="0.1" value="0.3">
+
+最低BET
+<input id="minBet" type="number" value="5">
 
 <button onclick="saveSettings()">保存</button>
 
@@ -91,67 +95,48 @@ background:#f39c12;
 
 <div class="card">
 
+<h3>ゲーム状況</h3>
+
+ラウンド : <span id="round">1</span>
+
+<br><br>
+
+POT : <span id="pot">0</span>
+
+</div>
+
+
+<div class="card">
+
 <h3>プレイヤー</h3>
 
-<div id="players"></div>
+<div id="playerList"></div>
 
 </div>
 
 
 <div class="card">
 
-<h3>BETしてる人</h3>
+<h3>BETしているプレイヤー</h3>
 
-<div id="betList"></div>
+<div id="betPlayers"></div>
 
 </div>
 
 
 <div class="card">
 
-<h3>管理</h3>
-
-<button class="reset" onclick="resetGame()">
+<button class="danger" onclick="resetGame()">
 ゲームリセット
 </button>
 
-<button class="roundreset" onclick="resetRound()">
-ラウンドリセット
-</button>
-
 </div>
+
 
 </div>
 
 
 <script>
-
-function saveSettings(){
-
-fetch("/settings/update",{
-
-method:"POST",
-
-headers:{
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-
-startMoney:parseInt(setMoney.value),
-startTrust:parseInt(setTrust.value),
-trustExchangeCost:parseInt(setTrustCost.value),
-trustExchangeRate:parseFloat(setTrustRate.value),
-minBet:parseInt(setMinBet.value)
-
-})
-
-})
-.then(()=>alert("設定保存"));
-
-}
-
-
 
 function loadState(){
 
@@ -159,43 +144,79 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
-const playersDiv=document.getElementById("players");
-const betDiv=document.getElementById("betList");
+document.getElementById("round").textContent=data.round;
 
-playersDiv.innerHTML="";
-betDiv.innerHTML="";
+let pot=0;
 
+for(let p in data.bets){
+pot+=data.bets[p];
+}
+
+document.getElementById("pot").textContent=pot;
+
+
+/* プレイヤー一覧 */
+
+const list=document.getElementById("playerList");
+list.innerHTML="";
 
 for(let p in data.players){
 
 const div=document.createElement("div");
-
 div.className="player";
 
-div.textContent=
-p+" : "+
-Math.floor(data.players[p])+
-" / 信用 "+
-(data.trust[p]||0);
+let text=p+" 💰"+Math.floor(data.players[p]);
 
-playersDiv.appendChild(div);
+if(data.loans[p]){
+text+=" 💳"+data.loans[p].amount;
+}
+
+if(data.eliminated[p]){
+text+=" ☠破産";
+}
+
+div.textContent=text;
+
+list.appendChild(div);
 
 }
 
 
+/* BETプレイヤー */
+
+const betDiv=document.getElementById("betPlayers");
+betDiv.innerHTML="";
 
 for(let p in data.bets){
 
-const row=document.createElement("div");
+const div=document.createElement("div");
+div.className="player betPlayer";
 
-row.className="player bet";
+div.textContent=p+" (BET "+data.bets[p]+")";
 
-row.innerHTML=
+const btn=document.createElement("button");
+btn.className="winnerBtn";
+btn.textContent="勝者";
 
-p+" (BET "+data.bets[p]+") "+
-'<button onclick="winner(\''+p+'\')">勝者</button>';
+btn.onclick=()=>{
 
-betDiv.appendChild(row);
+if(confirm(p+" を勝者にしますか？")){
+
+fetch("/winner",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({name:p})
+}).then(loadState);
+
+}
+
+};
+
+div.appendChild(btn);
+
+betDiv.appendChild(div);
 
 }
 
@@ -204,53 +225,51 @@ betDiv.appendChild(row);
 }
 
 
+/* 設定保存 */
 
-function winner(name){
+function saveSettings(){
 
-if(!confirm(name+" を勝者にしますか？"))
-return;
-
-fetch("/winner",{
-
+fetch("/settings",{
 method:"POST",
 headers:{
 "Content-Type":"application/json"
 },
+body:JSON.stringify({
 
-body:JSON.stringify({name})
+startMoney:parseFloat(startMoney.value),
+trustStart:parseFloat(trustStart.value),
+trustCost:parseFloat(trustCost.value),
+trustPercent:parseFloat(trustPercent.value),
+minBet:parseFloat(minBet.value)
 
 })
-.then(loadState);
+});
+
+alert("設定保存");
 
 }
 
 
+/* リセット */
 
 function resetGame(){
 
-if(!confirm("ゲームをリセットしますか？"))
-return;
+if(!confirm("ゲームリセットしますか？")) return;
 
-fetch("/game/reset",{method:"POST"})
-.then(()=>location.reload());
+fetch("/reset",{
+method:"POST"
+}).then(()=>{
 
-}
+alert("ゲームリセットしました");
 
+location.reload();
 
-
-function resetRound(){
-
-if(!confirm("ラウンドをリセットしますか？"))
-return;
-
-fetch("/round/reset",{method:"POST"})
-.then(loadState);
+});
 
 }
 
 
-
-setInterval(loadState,2000);
+setInterval(loadState,1000);
 
 </script>
 
