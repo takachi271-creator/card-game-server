@@ -1,130 +1,135 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Host</title>
+app.post("/loan/accept",(req,res)=>{
 
-<style>
+const {name}=req.body;
 
-body{
-background:#111;
-color:white;
-font-family:sans-serif;
-margin:0;
+const reqLoan=game.loanRequests[name];
+
+if(!reqLoan)return res.send("申請なし");
+
+const {borrower,amount}=reqLoan;
+
+if(game.players[name]<amount)
+return res.send("貸す金不足");
+
+game.players[name]-=amount;
+game.players[borrower]+=amount;
+
+game.loans[borrower]={lender:name,amount,round:game.round};
+
+game.trust[name]+=10;
+game.trust[borrower]-=5;
+
+delete game.loanRequests[name];
+
+res.json(game);
+
+});
+
+app.post("/loan/repay",(req,res)=>{
+
+const {name}=req.body;
+
+const loan=game.loans[name];
+
+if(!loan)return res.send("借金なし");
+
+const interest=Math.floor(loan.amount*0.1);
+
+const total=loan.amount+interest;
+
+if(game.players[name]<total)
+return res.send("所持金不足");
+
+game.players[name]-=total;
+game.players[loan.lender]+=total;
+
+game.trust[name]+=3;
+
+delete game.loans[name];
+
+res.json(game);
+
+});
+
+app.post("/trust/exchange",(req,res)=>{
+
+const {name}=req.body;
+
+if(game.trust[name]<game.settings.trustExchange)
+return res.send("信用不足");
+
+const gain=Math.floor(
+game.settings.startMoney*game.settings.trustPercent
+);
+
+game.trust[name]-=game.settings.trustExchange;
+game.players[name]+=gain;
+
+res.json(game);
+
+});
+
+app.post("/winner",(req,res)=>{
+
+const {name}=req.body;
+
+if(!game.bets[name])
+return res.send("BETなし");
+
+let pot=0;
+
+for(let p in game.bets){
+
+pot+=game.bets[p];
+game.players[p]-=game.bets[p];
+
 }
 
-.container{
-max-width:900px;
-margin:auto;
-padding:20px;
+const mult=calcMultiplier(
+game.bets[name],
+game.settings.startMoney
+);
+
+const reward=Math.floor(pot*mult);
+
+game.players[name]+=reward;
+
+game.turnHistory.push({
+round:game.round,
+winner:name,
+pot:pot,
+reward:reward
+});
+
+io.emit("turnEnd",{
+winner:name,
+amount:reward
+});
+
+game.bets={};
+game.folded={};
+
+game.round++;
+
+for(let p in game.players){
+
+if(game.players[p]<=0){
+
+game.eliminated[p]=true;
+
 }
 
-.card{
-background:#1c1c1c;
-padding:16px;
-border-radius:12px;
-margin-bottom:16px;
 }
 
-button{
-padding:10px 16px;
-margin:6px;
-border:none;
-border-radius:8px;
-background:#3498db;
-color:white;
-font-size:16px;
-}
+res.json(game);
 
-input{
-padding:8px;
-font-size:16px;
-margin:4px;
-}
-
-.qr{
-background:white;
-padding:6px;
-margin:6px;
-display:inline-block;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="container">
-
-<h1>HOST管理</h1>
+});
 
 <div class="card">
 
-<h3>プレイヤー登録</h3>
+<h3>BET履歴</h3>
 
-<input id="newPlayer" placeholder="名前">
-
-<button onclick="addPlayer()">追加</button>
-
-<div id="playerRegisterList"></div>
-
-</div>
-
-
-<div class="card">
-
-<h3>ゲーム設定</h3>
-
-初期資金  
-<input id="setMoney" type="number">
-
-信用初期  
-<input id="setTrust" type="number">
-
-信用換金  
-<input id="setExchange" type="number">
-
-換金割合  
-<input id="setPercent" step="0.1" type="number">
-
-最低BET  
-<input id="setMinBet" type="number">
-
-<br>
-
-<button onclick="saveSettings()">保存</button>
-
-<div id="settingView"></div>
-
-</div>
-
-
-<div class="card">
-
-<h3>ゲーム操作</h3>
-
-<button onclick="toggleBet()">BET受付切替</button>
-
-<button onclick="resetGame()">ゲームリセット</button>
-
-</div>
-
-
-<div class="card">
-
-<h3>勝者選択</h3>
-
-<div id="winnerButtons"></div>
-
-</div>
-
-
-<div class="card">
-
-<h3>他ゲーム操作</h3>
-
-<div id="otherGame"></div>
+<div id="betHistory"></div>
 
 </div>
 
@@ -138,90 +143,26 @@ display:inline-block;
 </div>
 
 
+<div class="card">
+
+<h3>他ゲーム用</h3>
+
+<div id="moneyControl"></div>
+
+</div>
+
+
+<div class="card">
+
+<button class="red" onclick="resetGame()">
+ゲームリセット
+</button>
+
+</div>
+
 </div>
 
 <script>
-
-function addPlayer(){
-
-fetch("/host/addPlayer",{
-
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-name:document.getElementById("newPlayer").value
-})
-
-}).then(loadState)
-
-}
-
-
-function saveSettings(){
-
-fetch("/host/settings",{
-
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-
-startMoney:setMoney.value,
-startTrust:setTrust.value,
-trustExchange:setExchange.value,
-trustPercent:setPercent.value,
-minBet:setMinBet.value
-
-})
-
-}).then(loadState)
-
-}
-
-
-function toggleBet(){
-
-fetch("/host/betToggle",{method:"POST"})
-.then(loadState)
-
-}
-
-
-function resetGame(){
-
-fetch("/host/reset",{method:"POST"})
-.then(loadState)
-
-}
-
-
-function chooseWinner(name){
-
-fetch("/winner",{
-
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name})
-
-}).then(loadState)
-
-}
-
-
-function betAction(name,type){
-
-fetch("/bet/result",{
-
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-name:name,
-type:type
-})
-
-}).then(loadState)
-
-}
-
 
 function loadState(){
 
@@ -229,126 +170,189 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
+round.textContent=data.round;
 
-// プレイヤー登録
-
-const reg=document.getElementById("playerRegisterList")
-
-reg.innerHTML=""
-
-data.allowedPlayers.forEach(name=>{
-
-const div=document.createElement("div")
-
-div.innerHTML=
-name+
-(data.online[name]?" 🟢":" ⚫")+
-` <button onclick="showQR('${name}')">QR</button>`
-
-reg.appendChild(div)
-
-})
+betStatus.textContent=data.betEnabled?"可能":"停止";
 
 
-// 設定表示
+setMoney.value=data.settings.startMoney;
+setTrust.value=data.settings.startTrust;
+setExchange.value=data.settings.trustExchange;
+setPercent.value=data.settings.trustPercent;
+setMinBet.value=data.settings.minBet;
+
 
 settingView.innerHTML=
-
-`初期資金 ${data.settings.startMoney}
-信用初期 ${data.settings.startTrust}
-信用換金 ${data.settings.trustExchange}
-換金割合 ${data.settings.trustPercent}
-最低BET ${data.settings.minBet}`
-
-
-// 勝者ボタン
-
-winnerButtons.innerHTML=""
-
-for(let p in data.bets){
-
-const btn=document.createElement("button")
-
-btn.textContent=p+" 勝者"
-
-btn.onclick=()=>chooseWinner(p)
-
-winnerButtons.appendChild(btn)
-
-}
+"現在設定<br>"+
+"初期資金 "+data.settings.startMoney+"<br>"+
+"信用 "+data.settings.startTrust+"<br>"+
+"信用換金 "+data.settings.trustExchange+"<br>"+
+"割合 "+data.settings.trustPercent+"<br>"+
+"最低BET "+data.settings.minBet;
 
 
-// 他ゲーム操作
+playerList.innerHTML="";
 
-const other=document.getElementById("otherGame")
+for(let p in data.registeredPlayers){
 
-other.innerHTML=""
+const div=document.createElement("div");
+div.className="player";
 
-for(let p in data.bets){
+div.innerHTML=
+p+
+" <button onclick=\"showQR('"+p+"')\">QR</button>"+
+" <button onclick=\"removePlayer('"+p+"')\">削除</button>";
 
-const bet=data.bets[p]
-
-if(bet<=0) continue
-
-const div=document.createElement("div")
-
-div.innerHTML=`
-
-${p} BET ${bet}
-
-<button onclick="betAction('${p}','confiscate')">没収</button>
-
-<button onclick="betAction('${p}','return')">返却</button>
-
-<button onclick="betAction('${p}','double')">2倍</button>
-
-<button onclick="betAction('${p}','triple')">3倍</button>
-
-`
-
-other.appendChild(div)
+playerList.appendChild(div);
 
 }
 
 
-// ターン履歴
+betPlayers.innerHTML="";
 
-const hist=document.getElementById("turnHistory")
+for(let p in data.bets){
 
-hist.innerHTML=""
+const btn=document.createElement("button");
 
-data.turnHistory.slice().reverse().forEach(t=>{
+btn.textContent=p+" 勝者";
 
-const div=document.createElement("div")
+btn.onclick=()=>chooseWinner(p);
+
+betPlayers.appendChild(btn);
+
+}
+
+
+betHistory.innerHTML="";
+
+data.betHistory.slice(-10).reverse().forEach(b=>{
+
+const div=document.createElement("div");
 
 div.textContent=
+"R"+b.round+" "+b.player+" BET "+b.bet;
 
-`R${t.round} ${t.winner} POT ${t.pot} x${t.multiplier} = ${t.win}`
+betHistory.appendChild(div);
 
-hist.appendChild(div)
+});
 
-})
 
-})
+turnHistory.innerHTML="";
+
+data.turnHistory.slice(-10).reverse().forEach(t=>{
+
+const div=document.createElement("div");
+
+div.textContent=
+"R"+t.round+" "+t.winner+" +"+t.reward;
+
+turnHistory.appendChild(div);
+
+});
+
+
+moneyControl.innerHTML="";
+
+for(let p in data.players){
+
+const div=document.createElement("div");
+
+div.innerHTML=
+p+
+" <button onclick=\"give('"+p+"',10)\">+10</button>"+
+" <button onclick=\"give('"+p+"',-10)\">-10</button>"+
+" <button onclick=\"give('"+p+"',data.bets['"+p+"']||0)\">返却</button>";
+
+moneyControl.appendChild(div);
 
 }
 
+});
+
+}
+
+
+function addPlayer(){
+
+const name=newPlayer.value;
+
+fetch("/registerPlayer",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name})
+}).then(loadState);
+
+}
+
+function removePlayer(name){
+
+fetch("/player/remove",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name})
+}).then(loadState);
+
+}
+
+function toggleBet(){
+
+fetch("/betToggle",{method:"POST"})
+.then(loadState);
+
+}
+
+function chooseWinner(name){
+
+fetch("/winner",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name})
+}).then(loadState);
+
+}
+
+function saveSettings(){
+
+fetch("/settings",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+
+startMoney:parseInt(setMoney.value),
+startTrust:parseInt(setTrust.value),
+trustExchange:parseInt(setExchange.value),
+trustPercent:parseFloat(setPercent.value),
+minBet:parseInt(setMinBet.value)
+
+})
+}).then(loadState);
+
+}
+
+function give(name,amount){
+
+fetch("/host/give",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name,amount})
+}).then(loadState);
+
+}
+
+function resetGame(){
+
+fetch("/host/reset",{method:"POST"})
+.then(loadState);
+
+}
 
 function showQR(name){
 
-const url = location.origin+"/?player="+name
-
-const qr =
-`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
-
-const w = window.open("")
-
-w.document.write(`<img src="${qr}">`)
+alert("QR: "+location.origin+"/player.html?name="+name);
 
 }
 
-
-setInterval(loadState,1000)
+setInterval(loadState,2000);
 
 </script>
 
