@@ -40,7 +40,6 @@ betEnabled:true
 io.on("connection",(socket)=>{
 
 socket.on("register",(name)=>{
-
 sockets[name]=socket;
 game.online[name]=true;
 
@@ -51,7 +50,6 @@ game.online[name]=false;
 });
 
 });
-
 
 function loanChance(trust){
 
@@ -67,7 +65,6 @@ return 0;
 
 }
 
-
 /* プレイヤー追加 */
 
 app.post("/player/add",(req,res)=>{
@@ -80,7 +77,6 @@ game.allowedPlayers.push(name);
 res.json(game);
 
 });
-
 
 /* 参加 */
 
@@ -103,7 +99,6 @@ game.loanUsed[name]=false;
 res.json(game);
 
 });
-
 
 /* BET */
 
@@ -131,8 +126,7 @@ res.json(game);
 
 });
 
-
-/* BET切替 */
+/* BET受付切替 */
 
 app.post("/bet/toggle",(req,res)=>{
 
@@ -142,7 +136,6 @@ res.json(game);
 
 });
 
-
 /* 借金 */
 
 app.post("/loan/request",(req,res)=>{
@@ -150,7 +143,7 @@ app.post("/loan/request",(req,res)=>{
 const {name,amount}=req.body;
 
 if(game.loanUsed[name])
-return res.send("このラウンドでは借金済み");
+return res.send("このラウンドで借金済み");
 
 const chance=loanChance(game.trust[name]);
 
@@ -178,7 +171,6 @@ res.json({lender});
 
 });
 
-
 app.post("/loan/accept",(req,res)=>{
 
 const {name}=req.body;
@@ -203,7 +195,6 @@ res.json(game);
 
 });
 
-
 app.post("/loan/repay",(req,res)=>{
 
 const {name}=req.body;
@@ -226,7 +217,6 @@ res.json(game);
 
 });
 
-
 /* 信用換金 */
 
 app.post("/trust/exchange",(req,res)=>{
@@ -244,7 +234,6 @@ game.players[name]+=gain;
 res.json(game);
 
 });
-
 
 /* 勝者 */
 
@@ -294,40 +283,23 @@ res.json(game);
 
 });
 
-
-/* 設定 */
+/* ゲーム設定 */
 
 app.post("/settings",(req,res)=>{
 
-const {
-startMoney,
-trustStart,
-trustCost,
-trustPercent,
-minBet
-}=req.body;
+const {startMoney,trustStart,trustCost,trustPercent,minBet}=req.body;
 
-if(startMoney!==undefined)
 game.startMoney=Number(startMoney);
-
-if(trustStart!==undefined)
 game.trustStart=Number(trustStart);
-
-if(trustCost!==undefined)
 game.trustCost=Number(trustCost);
-
-if(trustPercent!==undefined)
 game.trustPercent=Number(trustPercent);
-
-if(minBet!==undefined)
 game.minBet=Number(minBet);
 
 res.json(game);
 
 });
 
-
-/* リセット */
+/* ゲームリセット */
 
 app.post("/reset",(req,res)=>{
 
@@ -345,11 +317,9 @@ res.json(game);
 
 });
 
-
 app.get("/state",(req,res)=>{
 res.json(game);
 });
-
 
 const PORT = process.env.PORT || 3000;
 

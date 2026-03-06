@@ -5,27 +5,23 @@
 <title>Host</title>
 
 <style>
-
 body{
 background:#111;
 color:white;
 font-family:sans-serif;
 text-align:center;
 }
-
 .card{
 background:#1c1c1c;
 padding:14px;
 margin:12px;
 border-radius:12px;
 }
-
 button,input{
 padding:10px;
 margin:6px;
 font-size:16px;
 }
-
 </style>
 
 </head>
@@ -42,25 +38,29 @@ font-size:16px;
 
 <input id="newPlayerName" placeholder="名前">
 
-<button onclick="addPlayer()">追加</button>
+<button onclick="addPlayer()">プレイヤー追加</button>
 
 </div>
 
+<div class="card">
+
+<h3>QRコード</h3>
+
+<button onclick="showQR()">QR表示</button>
+
+<div id="qr"></div>
+
+</div>
 
 <div class="card">
 
 <p>ラウンド : <span id="round"></span></p>
-
 <p>POT : <span id="pot"></span></p>
-
-<p>BET状態 :
-<span id="betState"></span>
-</p>
+<p>BET状態 : <span id="betState"></span></p>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
 </div>
-
 
 <div class="card">
 
@@ -85,92 +85,30 @@ font-size:16px;
 
 </div>
 
-
 <div class="card">
 
-<h3>BETプレイヤー</h3>
-
-<div id="bets"></div>
+<button onclick="resetGame()">ゲームリセット</button>
 
 </div>
 
-
 <script>
 
-function loadState(){
+function showQR(){
 
-fetch("/state")
-.then(r=>r.json())
-.then(data=>{
+const url=location.origin+"/player.html";
 
-round.textContent=data.round;
-
-let pot=0;
-
-for(let p in data.bets)
-pot+=data.bets[p];
-
-pot?pot:0;
-
-document.getElementById("pot").textContent=pot;
-
-betState.textContent=data.betEnabled?"可能":"不可能";
-
-
-players.innerHTML="";
-
-for(let p of data.allowedPlayers){
-
-const div=document.createElement("div");
-
-const online=data.online[p];
-
-div.textContent=p+" "+(online?"🟢":"🔴");
-
-players.appendChild(div);
+qr.innerHTML=
+"<img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+url+"'>";
 
 }
 
-
-bets.innerHTML="";
-
-for(let p in data.bets){
-
-const div=document.createElement("div");
-
-div.textContent=p+" (BET "+data.bets[p]+") ";
-
-const btn=document.createElement("button");
-
-btn.textContent="勝者";
-
-btn.onclick=()=>{
-
-fetch("/winner",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:p})
-});
-
-};
-
-div.appendChild(btn);
-
-bets.appendChild(div);
-
+function resetGame(){
+fetch("/reset",{method:"POST"});
 }
 
-
-startMoney.value=data.startMoney;
-trustStart.value=data.trustStart;
-trustCost.value=data.trustCost;
-trustPercent.value=data.trustPercent;
-minBet.value=data.minBet;
-
-});
-
+function toggleBet(){
+fetch("/bet/toggle",{method:"POST"});
 }
-
 
 function addPlayer(){
 
@@ -178,17 +116,9 @@ fetch("/player/add",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:newPlayerName.value})
-}).then(loadState);
+});
 
 }
-
-
-function toggleBet(){
-
-fetch("/bet/toggle",{method:"POST"});
-
-}
-
 
 function saveSettings(){
 
@@ -207,9 +137,6 @@ minBet:minBet.value
 });
 
 }
-
-
-setInterval(loadState,1000);
 
 </script>
 
