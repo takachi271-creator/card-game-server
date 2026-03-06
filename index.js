@@ -24,6 +24,8 @@ loanRequests:{},
 trust:{},
 loanUsed:{},
 
+eliminated:{},
+
 allowedPlayers:[],
 online:{},
 
@@ -67,6 +69,8 @@ return 0;
 
 }
 
+/* プレイヤー追加 */
+
 app.post("/player/add",(req,res)=>{
 
 const {name}=req.body;
@@ -78,6 +82,8 @@ res.json(game);
 
 });
 
+/* プレイヤーリセット */
+
 app.post("/player/reset",(req,res)=>{
 
 const {name}=req.body;
@@ -87,10 +93,13 @@ delete game.bets[name];
 delete game.trust[name];
 delete game.loans[name];
 delete game.betHistory[name];
+delete game.eliminated[name];
 
 res.json(game);
 
 });
+
+/* 参加 */
 
 app.post("/join",(req,res)=>{
 
@@ -105,6 +114,7 @@ game.players[name]=game.startMoney;
 game.trust[name]=game.trustStart;
 game.betHistory[name]=[];
 game.loanUsed[name]=false;
+game.eliminated[name]=false;
 
 }
 
@@ -112,9 +122,14 @@ res.json(game);
 
 });
 
+/* BET */
+
 app.post("/bet",(req,res)=>{
 
 const {name,amount}=req.body;
+
+if(game.eliminated[name])
+return res.send("破産しています");
 
 if(!game.betEnabled)
 return res.send("BET停止中");
@@ -136,6 +151,8 @@ res.json(game);
 
 });
 
+/* BET受付切替 */
+
 app.post("/bet/toggle",(req,res)=>{
 
 game.betEnabled=!game.betEnabled;
@@ -143,6 +160,8 @@ game.betEnabled=!game.betEnabled;
 res.json(game);
 
 });
+
+/* 借金 */
 
 app.post("/loan/request",(req,res)=>{
 
@@ -223,6 +242,8 @@ res.json(game);
 
 });
 
+/* 信用換金 */
+
 app.post("/trust/exchange",(req,res)=>{
 
 const {name}=req.body;
@@ -238,6 +259,8 @@ game.players[name]+=gain;
 res.json(game);
 
 });
+
+/* 勝者 */
 
 app.post("/winner",(req,res)=>{
 
@@ -263,15 +286,13 @@ winner:name,
 amount:pot
 });
 
-for(let p in game.bets){
+/* 破産判定 */
 
-if(!game.betHistory[p])
-game.betHistory[p]=[];
+for(let p in game.players){
 
-game.betHistory[p].push({
-round:game.round,
-amount:game.bets[p]
-});
+if(game.players[p] <= 0){
+game.eliminated[p] = true;
+}
 
 }
 
@@ -291,6 +312,8 @@ res.json(game);
 
 });
 
+/* 設定 */
+
 app.post("/settings",(req,res)=>{
 
 const {startMoney,trustStart,trustCost,trustPercent,minBet}=req.body;
@@ -305,6 +328,8 @@ res.json(game);
 
 });
 
+/* ゲームリセット */
+
 app.post("/reset",(req,res)=>{
 
 game.players={};
@@ -316,6 +341,7 @@ game.loanRequests={};
 game.trust={};
 game.loanUsed={};
 game.online={};
+game.eliminated={};
 game.round=1;
 
 res.json(game);

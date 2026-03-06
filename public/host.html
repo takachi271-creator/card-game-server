@@ -56,7 +56,7 @@ font-size:16px;
 
 <p>ラウンド : <span id="round"></span></p>
 <p>POT : <span id="pot"></span></p>
-<p>BET : <span id="betState"></span></p>
+<p>BET状態 : <span id="betState"></span></p>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
@@ -80,6 +80,29 @@ font-size:16px;
 
 <div class="card">
 
+<h3>ゲーム設定</h3>
+
+初期資金<br>
+<input id="startMoney"><br>
+
+信用初期値<br>
+<input id="trustStart"><br>
+
+信用換金コスト<br>
+<input id="trustCost"><br>
+
+信用換金％<br>
+<input id="trustPercent"><br>
+
+最低BET<br>
+<input id="minBet"><br>
+
+<button onclick="saveSettings()">保存</button>
+
+</div>
+
+<div class="card">
+
 <button onclick="resetGame()">ゲームリセット</button>
 
 </div>
@@ -95,12 +118,13 @@ fetch("/state")
 round.textContent=data.round;
 
 let pot=0;
-
 for(let p in data.bets) pot+=data.bets[p];
 
 document.getElementById("pot").textContent=pot;
 
 betState.textContent=data.betEnabled?"可能":"不可能";
+
+/* プレイヤー */
 
 players.innerHTML="";
 
@@ -144,6 +168,8 @@ players.appendChild(div);
 
 }
 
+/* BET */
+
 bets.innerHTML="";
 
 for(let p in data.bets){
@@ -166,10 +192,11 @@ body:JSON.stringify({name:p})
 };
 
 div.appendChild(btn);
-
 bets.appendChild(div);
 
 }
+
+/* 履歴 */
 
 history.innerHTML="";
 
@@ -177,8 +204,7 @@ for(let h of data.turnHistory.slice().reverse()){
 
 const div=document.createElement("div");
 
-div.textContent=
-"Round "+h.round+" : "+h.winner+" +"+h.amount;
+div.textContent="Round "+h.round+" : "+h.winner+" +"+h.amount;
 
 history.appendChild(div);
 
@@ -204,6 +230,24 @@ fetch("/bet/toggle",{method:"POST"});
 
 function resetGame(){
 fetch("/reset",{method:"POST"});
+}
+
+function saveSettings(){
+
+fetch("/settings",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+
+startMoney:startMoney.value,
+trustStart:trustStart.value,
+trustCost:trustCost.value,
+trustPercent:trustPercent.value,
+minBet:minBet.value
+
+})
+});
+
 }
 
 setInterval(loadState,1000);
