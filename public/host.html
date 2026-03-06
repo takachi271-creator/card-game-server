@@ -5,7 +5,6 @@
 <title>Host</title>
 
 <style>
-
 body{
 background:#111;
 color:white;
@@ -25,7 +24,6 @@ padding:10px;
 margin:10px;
 border-radius:10px;
 }
-
 </style>
 
 </head>
@@ -38,26 +36,20 @@ border-radius:10px;
 
 <h3>ゲーム設定</h3>
 
-初期資金  
+初期資金
 <input id="startMoney" type="number">
 
-<br>
-
-信用初期値  
+信用初期値
 <input id="trustStart" type="number">
 
-<br>
-
-信用換金  
+信用換金
 <input id="trustCost" type="number">
 
 → %
 
 <input id="trustPercent" type="number" step="0.1">
 
-<br>
-
-最低BET  
+最低BET
 <input id="minBet" type="number">
 
 <br>
@@ -66,10 +58,7 @@ border-radius:10px;
 
 </div>
 
-
 <div class="card">
-
-<h3>ゲーム状況</h3>
 
 ラウンド : <span id="round"></span><br>
 POT : <span id="pot"></span><br>
@@ -81,7 +70,6 @@ BET状態 : <span id="betState"></span>
 
 </div>
 
-
 <div class="card">
 
 <h3>プレイヤー</h3>
@@ -90,7 +78,6 @@ BET状態 : <span id="betState"></span>
 
 </div>
 
-
 <div class="card">
 
 <h3>BETプレイヤー</h3>
@@ -98,7 +85,6 @@ BET状態 : <span id="betState"></span>
 <div id="bets"></div>
 
 </div>
-
 
 <div class="card">
 
@@ -128,17 +114,6 @@ document.getElementById("pot").textContent=pot;
 betState.textContent=data.betEnabled?"可能":"不可能";
 
 
-/* 設定表示 */
-
-startMoney.value=data.startMoney;
-trustStart.value=data.trustStart;
-trustCost.value=data.trustCost;
-trustPercent.value=data.trustPercent;
-minBet.value=data.minBet;
-
-
-/* プレイヤー */
-
 players.innerHTML="";
 
 for(let p in data.players){
@@ -152,8 +127,6 @@ players.appendChild(div);
 
 }
 
-
-/* BET */
 
 bets.innerHTML="";
 

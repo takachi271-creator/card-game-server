@@ -91,7 +91,6 @@ z-index:999;
 
 <div id="playerNameTitle"></div>
 
-
 <div class="card">
 
 <p>💰 所持金: <span id="money">0</span></p>
@@ -99,10 +98,6 @@ z-index:999;
 <p>💳 借金: <span id="debt">なし</span></p>
 
 <p>⭐ 信用: <span id="trustValue">0</span></p>
-
-<p id="gameOver" style="color:red;font-weight:bold;display:none;">
-☠ 破産しました
-</p>
 
 </div>
 
@@ -117,7 +112,7 @@ z-index:999;
 
 <p>最低BET : <span id="minBet">0</span></p>
 
-<p>借金成功率 : <span id="loanChance">0%</span></p>
+<p>現在BET : <span id="betStatus"></span></p>
 
 </div>
 
@@ -126,23 +121,24 @@ z-index:999;
 
 <h3>⭐ 信用ポイント</h3>
 
-<p style="text-align:center;">現在</p>
+<p>現在</p>
 
-<p style="font-size:30px;font-weight:bold;text-align:center;" id="trustBig">
-0
+<p style="font-size:30px;text-align:center;">
+<span id="trustNow">0</span>
 </p>
 
-<p style="text-align:center;">
-通知成功率 :
-<span id="trustChance">0%</span>
+<p>
+通知成功率 : <span id="trustChance">0%</span>
 </p>
 
-<p style="text-align:center;">
-換金
-信用30 → +30
+<p>
+換金 : 信用<span id="trustCost">30</span>
+→ +<span id="trustGain">30</span>
 </p>
 
-<button onclick="exchangeTrust()">信用換金</button>
+<button onclick="exchangeTrust()">
+信用換金
+</button>
 
 </div>
 
@@ -151,17 +147,9 @@ z-index:999;
 
 <h3>BET</h3>
 
-<p>現在倍率 : <span id="multiplier">1.2x</span></p>
-
-<p>現在BET : <span id="myBet">0</span></p>
-
 <input id="betAmount" type="number" placeholder="BET金額">
 
-<p>勝利時 : <span id="winPreview">0</span></p>
-
 <button onclick="bet()">ベット</button>
-
-<button onclick="allIn()">🔥 オールイン</button>
 
 </div>
 
@@ -170,26 +158,11 @@ z-index:999;
 
 <h3>借金</h3>
 
-<p>現在借金 : <span id="loanNow">0</span></p>
-
-<p>利息 : <span id="loanInterest">0</span></p>
-
-<button onclick="repayLoan()">全額返済</button>
-
-<hr>
-
 <input id="loanAmount" type="number" placeholder="借りたい額">
 
 <button onclick="requestLoan()">借りる</button>
 
-</div>
-
-
-<div class="card">
-
-<h3>参加プレイヤー</h3>
-
-<div id="playerList"></div>
+<div id="repayArea"></div>
 
 </div>
 
@@ -203,6 +176,14 @@ z-index:999;
 </div>
 
 
+<div class="card">
+
+<h3>参加プレイヤー</h3>
+
+<div id="playerList"></div>
+
+</div>
+
 </div>
 </div>
 
@@ -212,23 +193,6 @@ z-index:999;
 const socket = io();
 
 let currentName="";
-
-
-function calcMultiplier(amount,startMoney){
-
-const percent=(amount/startMoney)*100;
-
-if(percent>=500) return 5;
-if(percent>=200) return 3;
-if(percent>=150) return 2;
-if(percent>=100) return 1.9;
-if(percent>=75) return 1.8;
-if(percent>=50) return 1.5;
-if(percent>=20) return 1.4;
-
-return 1.2;
-
-}
 
 
 function joinGame(){
@@ -258,6 +222,8 @@ loadState();
 }
 
 
+/* BET */
+
 function bet(){
 
 const amount=parseInt(betAmount.value)||0;
@@ -266,38 +232,17 @@ fetch("/bet",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
-}).then(loadState);
-
-}
-
-
-function allIn(){
-
-fetch("/state")
-.then(r=>r.json())
-.then(data=>{
-
-const debt=data.loans[currentName]?.amount||0;
-
-const maxBet=data.players[currentName]+debt;
-
-fetch("/bet",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-name:currentName,
-amount:maxBet
 })
-}).then(loadState);
-
-});
+.then(loadState);
 
 }
 
+
+/* 借金 */
 
 function requestLoan(){
 
-const amount=parseInt(loanAmount.value);
+const amount=parseInt(loanAmount.value)||0;
 
 fetch("/loan/request",{
 method:"POST",
@@ -308,16 +253,7 @@ body:JSON.stringify({name:currentName,amount})
 }
 
 
-function repayLoan(){
-
-fetch("/loan/repay",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-}).then(loadState);
-
-}
-
+/* 信用換金 */
 
 function exchangeTrust(){
 
@@ -325,14 +261,116 @@ fetch("/trust/exchange",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName})
-}).then(loadState);
+})
+.then(loadState);
 
 }
 
 
+/* 状態更新 */
+
+function loadState(){
+
+fetch("/state")
+.then(r=>r.json())
+.then(data=>{
+
+money.textContent=data.players[currentName]||0;
+
+round.textContent=data.round;
+
+minBet.textContent=data.minBet;
+
+betStatus.textContent=data.betEnabled?"可能":"不可能";
+
+let pot=0;
+
+for(let p in data.bets){
+pot+=data.bets[p];
+}
+
+document.getElementById("pot").textContent=pot;
+
+
+/* 信用 */
+
+const trust=data.trust[currentName]||0;
+
+trustValue.textContent=trust;
+
+trustNow.textContent=trust;
+
+trustCost.textContent=data.trustCost;
+
+const gain=Math.floor(data.startMoney * data.trustPercent);
+
+trustGain.textContent=gain;
+
+
+/* 成功率 */
+
+let chance=0;
+
+if(trust>=100) chance=100;
+else if(trust>=80) chance=80;
+else if(trust>=70) chance=70;
+else if(trust>=50) chance=50;
+else if(trust>=30) chance=30;
+else if(trust>=10) chance=10;
+else if(trust>=1) chance=5;
+
+trustChance.textContent=chance+"%";
+
+
+/* BET履歴 */
+
+betHistory.innerHTML="";
+
+const history=data.betHistory[currentName]||[];
+
+history.slice(-5).reverse().forEach(h=>{
+
+const div=document.createElement("div");
+
+div.textContent=
+"Round "+h.round+" : "+h.amount;
+
+betHistory.appendChild(div);
+
+});
+
+
+/* プレイヤー一覧 */
+
+playerList.innerHTML="";
+
+for(let p in data.players){
+
+const div=document.createElement("div");
+
+div.textContent=
+p+" 💰"+Math.floor(data.players[p]);
+
+if(data.bets[p])
+div.textContent+=" (BET "+data.bets[p]+")";
+
+playerList.appendChild(div);
+
+}
+
+});
+
+}
+
+
+setInterval(loadState,1000);
+
+
+/* 借金通知 */
+
 socket.on("loanRequest",(data)=>{
 
-if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
+if(confirm(data.borrower+" が "+data.amount+" 借りたい\n貸しますか？")){
 
 fetch("/loan/accept",{
 method:"POST",
@@ -353,147 +391,22 @@ body:JSON.stringify({name:currentName})
 });
 
 
+/* 勝者通知 */
+
 socket.on("turnEnd",(data)=>{
 
-const popup=document.getElementById("winnerPopup");
+winnerPopup.innerHTML=
+"🏆 "+data.winner+" 勝利<br>+"+data.amount;
 
-popup.innerHTML=
-"🏆 勝者<br><br>"+
-data.winner+
-"<br><br>+"+
-data.amount;
-
-popup.style.display="block";
+winnerPopup.style.display="block";
 
 setTimeout(()=>{
-popup.style.display="none";
+winnerPopup.style.display="none";
 },2000);
 
 loadState();
 
 });
-
-
-function loadState(){
-
-fetch("/state")
-
-.then(r=>r.json())
-
-.then(data=>{
-
-money.textContent=Math.floor(data.players[currentName]||0);
-
-const loan=data.loans[currentName];
-
-loanNow.textContent=loan?loan.amount:0;
-
-loanInterest.textContent=loan?Math.floor(loan.amount*0.1):0;
-
-debt.textContent=loan?loan.amount:"なし";
-
-round.textContent=data.round;
-
-trustValue.textContent=data.trust[currentName]||0;
-
-trustBig.textContent=data.trust[currentName]||0;
-
-
-let pot=0;
-
-for(let p in data.bets){
-pot+=data.bets[p];
-}
-
-pot?pot:0;
-
-document.getElementById("pot").textContent=pot;
-
-
-const myBet=data.bets[currentName]||0;
-
-myBet ? myBet : 0;
-
-document.getElementById("myBet").textContent=myBet;
-
-
-const multiplierValue=myBet>0
-?calcMultiplier(myBet,data.startMoney)
-:1.2;
-
-multiplier.textContent=multiplierValue+"x";
-
-
-const win=Math.floor(myBet*multiplierValue);
-
-winPreview.textContent="+"+win;
-
-
-const trust=data.trust[currentName]||0;
-
-let chance=0;
-
-if(trust>=100) chance=100;
-else if(trust>=80) chance=80;
-else if(trust>=70) chance=70;
-else if(trust>=50) chance=50;
-else if(trust>=30) chance=30;
-else if(trust>=10) chance=10;
-else if(trust>=1) chance=5;
-
-loanChance.textContent=chance+"%";
-
-trustChance.textContent=chance+"%";
-
-
-playerList.innerHTML="";
-
-for(let p in data.players){
-
-const div=document.createElement("div");
-
-div.className=data.bets[p]?"betActive":"";
-
-if(data.eliminated[p]){
-
-div.textContent=`${p} ☠ 破産しました`;
-
-}else{
-
-div.textContent=
-`${p} 💰${Math.floor(data.players[p])}`
-+(data.loans[p]?` 💳${data.loans[p].amount}`:"")
-+` ⭐${data.trust[p]}`
-+(data.bets[p]?` (BET ${data.bets[p]})`:"");
-
-}
-
-playerList.appendChild(div);
-
-}
-
-
-const historyDiv=document.getElementById("betHistory");
-
-historyDiv.innerHTML="";
-
-for(let p in data.betHistory){
-
-const div=document.createElement("div");
-
-div.textContent=
-p+" : "+data.betHistory[p].join(" → ");
-
-historyDiv.appendChild(div);
-
-}
-
-});
-
-}
-
-
-setInterval(loadState,1000);
 
 </script>
 
