@@ -5,6 +5,7 @@
 <title>Host</title>
 
 <style>
+
 body{
 background:#111;
 color:white;
@@ -12,42 +13,99 @@ font-family:sans-serif;
 text-align:center;
 }
 
-button{
-padding:12px;
-font-size:18px;
-margin:8px;
+input,button{
+padding:10px;
+margin:6px;
+font-size:16px;
 }
+
+.card{
+background:#222;
+padding:10px;
+margin:10px;
+border-radius:10px;
+}
+
 </style>
 
 </head>
 
 <body>
 
-<h1>ホスト管理</h1>
+<h2>ホスト管理</h2>
 
-<p>ラウンド : <span id="round"></span></p>
+<div class="card">
 
-<p>POT : <span id="pot"></span></p>
+<h3>ゲーム設定</h3>
 
-<p>BET状態 : <span id="betStatus"></span></p>
+初期資金  
+<input id="startMoney" type="number">
+
+<br>
+
+信用初期値  
+<input id="trustStart" type="number">
+
+<br>
+
+信用換金  
+<input id="trustCost" type="number">
+
+→ %
+
+<input id="trustPercent" type="number" step="0.1">
+
+<br>
+
+最低BET  
+<input id="minBet" type="number">
+
+<br>
+
+<button onclick="saveSettings()">設定保存</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>ゲーム状況</h3>
+
+ラウンド : <span id="round"></span><br>
+POT : <span id="pot"></span><br>
+BET状態 : <span id="betState"></span>
+
+<br><br>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
-<hr>
+</div>
 
-<h2>プレイヤー</h2>
+
+<div class="card">
+
+<h3>プレイヤー</h3>
 
 <div id="players"></div>
 
-<hr>
+</div>
 
-<h2>BETプレイヤー</h2>
+
+<div class="card">
+
+<h3>BETプレイヤー</h3>
 
 <div id="bets"></div>
 
-<hr>
+</div>
+
+
+<div class="card">
 
 <button onclick="resetGame()">ゲームリセット</button>
+
+</div>
+
 
 <script>
 
@@ -65,9 +123,21 @@ for(let p in data.bets){
 pot+=data.bets[p];
 }
 
-pot.textContent=pot;
+document.getElementById("pot").textContent=pot;
 
-betStatus.textContent=data.betEnabled?"可能":"不可能";
+betState.textContent=data.betEnabled?"可能":"不可能";
+
+
+/* 設定表示 */
+
+startMoney.value=data.startMoney;
+trustStart.value=data.trustStart;
+trustCost.value=data.trustCost;
+trustPercent.value=data.trustPercent;
+minBet.value=data.minBet;
+
+
+/* プレイヤー */
 
 players.innerHTML="";
 
@@ -83,14 +153,15 @@ players.appendChild(div);
 }
 
 
+/* BET */
+
 bets.innerHTML="";
 
 for(let p in data.bets){
 
 const div=document.createElement("div");
 
-div.textContent=
-p+" (BET "+data.bets[p]+")";
+div.textContent=p+" (BET "+data.bets[p]+") ";
 
 const btn=document.createElement("button");
 
@@ -100,9 +171,7 @@ btn.onclick=()=>{
 
 fetch("/winner",{
 method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
+headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:p})
 });
 
@@ -121,8 +190,25 @@ bets.appendChild(div);
 
 function toggleBet(){
 
-fetch("/bet/toggle",{
-method:"POST"
+fetch("/bet/toggle",{method:"POST"});
+
+}
+
+
+function saveSettings(){
+
+fetch("/settings",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+
+startMoney:Number(startMoney.value),
+trustStart:Number(trustStart.value),
+trustCost:Number(trustCost.value),
+trustPercent:Number(trustPercent.value),
+minBet:Number(minBet.value)
+
+})
 });
 
 }
@@ -130,9 +216,7 @@ method:"POST"
 
 function resetGame(){
 
-fetch("/reset",{
-method:"POST"
-});
+fetch("/reset",{method:"POST"});
 
 }
 
