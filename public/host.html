@@ -5,136 +5,49 @@
 <title>Host</title>
 
 <style>
-
 body{
 background:#111;
 color:white;
 font-family:sans-serif;
-margin:0;
-}
-
-.container{
-max-width:500px;
-margin:auto;
-padding:15px;
-}
-
-.card{
-background:#1c1c1c;
-padding:15px;
-border-radius:12px;
-margin-bottom:12px;
-}
-
-button,input{
-width:100%;
-padding:12px;
-font-size:16px;
-margin-top:8px;
-border:none;
-border-radius:8px;
-box-sizing:border-box;
+text-align:center;
 }
 
 button{
-background:#2ecc71;
-color:white;
+padding:12px;
+font-size:18px;
+margin:8px;
 }
-
-.player{
-padding:6px;
-border-bottom:1px solid #333;
-}
-
-.betPlayer{
-color:#2ecc71;
-font-weight:bold;
-}
-
-.winnerBtn{
-background:#3498db;
-margin-top:5px;
-}
-
-.danger{
-background:#e74c3c;
-}
-
 </style>
+
 </head>
 
 <body>
 
-<div class="container">
+<h1>ホスト管理</h1>
 
-<h2>ホスト管理</h2>
+<p>ラウンド : <span id="round"></span></p>
 
-<div class="card">
+<p>POT : <span id="pot"></span></p>
 
-<h3>ゲーム設定</h3>
+<p>BET状態 : <span id="betStatus"></span></p>
 
-初期資金
-<input id="startMoney" type="number" value="100">
+<button onclick="toggleBet()">BET受付切替</button>
 
-信用初期値
-<input id="trustStart" type="number" value="80">
+<hr>
 
-信用換金
-<input id="trustCost" type="number" value="30">
+<h2>プレイヤー</h2>
 
-換金率 %
-<input id="trustPercent" type="number" step="0.1" value="0.3">
+<div id="players"></div>
 
-最低BET
-<input id="minBet" type="number" value="5">
+<hr>
 
-<button onclick="saveSettings()">保存</button>
+<h2>BETプレイヤー</h2>
 
-</div>
+<div id="bets"></div>
 
+<hr>
 
-<div class="card">
-
-<h3>ゲーム状況</h3>
-
-ラウンド : <span id="round">1</span>
-
-<br><br>
-
-POT : <span id="pot">0</span>
-
-</div>
-
-
-<div class="card">
-
-<h3>プレイヤー</h3>
-
-<div id="playerList"></div>
-
-</div>
-
-
-<div class="card">
-
-<h3>BETしているプレイヤー</h3>
-
-<div id="betPlayers"></div>
-
-</div>
-
-
-<div class="card">
-
-<button class="danger" onclick="resetGame()">
-ゲームリセット
-</button>
-
-</div>
-
-
-</div>
-
+<button onclick="resetGame()">ゲームリセット</button>
 
 <script>
 
@@ -144,7 +57,7 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
-document.getElementById("round").textContent=data.round;
+round.textContent=data.round;
 
 let pot=0;
 
@@ -152,55 +65,38 @@ for(let p in data.bets){
 pot+=data.bets[p];
 }
 
-document.getElementById("pot").textContent=pot;
+pot.textContent=pot;
 
+betStatus.textContent=data.betEnabled?"可能":"不可能";
 
-/* プレイヤー一覧 */
-
-const list=document.getElementById("playerList");
-list.innerHTML="";
+players.innerHTML="";
 
 for(let p in data.players){
 
 const div=document.createElement("div");
-div.className="player";
 
-let text=p+" 💰"+Math.floor(data.players[p]);
+div.textContent=
+p+" : "+data.players[p];
 
-if(data.loans[p]){
-text+=" 💳"+data.loans[p].amount;
-}
-
-if(data.eliminated[p]){
-text+=" ☠破産";
-}
-
-div.textContent=text;
-
-list.appendChild(div);
+players.appendChild(div);
 
 }
 
 
-/* BETプレイヤー */
-
-const betDiv=document.getElementById("betPlayers");
-betDiv.innerHTML="";
+bets.innerHTML="";
 
 for(let p in data.bets){
 
 const div=document.createElement("div");
-div.className="player betPlayer";
 
-div.textContent=p+" (BET "+data.bets[p]+")";
+div.textContent=
+p+" (BET "+data.bets[p]+")";
 
 const btn=document.createElement("button");
-btn.className="winnerBtn";
+
 btn.textContent="勝者";
 
 btn.onclick=()=>{
-
-if(confirm(p+" を勝者にしますか？")){
 
 fetch("/winner",{
 method:"POST",
@@ -208,15 +104,13 @@ headers:{
 "Content-Type":"application/json"
 },
 body:JSON.stringify({name:p})
-}).then(loadState);
-
-}
+});
 
 };
 
 div.appendChild(btn);
 
-betDiv.appendChild(div);
+bets.appendChild(div);
 
 }
 
@@ -225,45 +119,19 @@ betDiv.appendChild(div);
 }
 
 
-/* 設定保存 */
+function toggleBet(){
 
-function saveSettings(){
-
-fetch("/settings",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-
-startMoney:parseFloat(startMoney.value),
-trustStart:parseFloat(trustStart.value),
-trustCost:parseFloat(trustCost.value),
-trustPercent:parseFloat(trustPercent.value),
-minBet:parseFloat(minBet.value)
-
-})
+fetch("/bet/toggle",{
+method:"POST"
 });
-
-alert("設定保存");
 
 }
 
-
-/* リセット */
 
 function resetGame(){
 
-if(!confirm("ゲームリセットしますか？")) return;
-
 fetch("/reset",{
 method:"POST"
-}).then(()=>{
-
-alert("ゲームリセットしました");
-
-location.reload();
-
 });
 
 }

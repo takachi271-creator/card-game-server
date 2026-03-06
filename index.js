@@ -12,274 +12,303 @@ app.use(express.static("public"));
 let sockets = {};
 
 let game = {
-  players:{},
-  bets:{},
-  betHistory:{},
-  loans:{},
-  loanRequests:{},
-  trust:{},
-  eliminated:{},
-  startMoney:100,
-  minBet:5,
-  round:1
+players:{},
+bets:{},
+loans:{},
+loanRequests:{},
+trust:{},
+eliminated:{},
+
+startMoney:100,
+minBet:5,
+
+trustStart:80,
+trustCost:30,
+trustPercent:0.3,
+
+round:1,
+betEnabled:true
 };
 
 io.on("connection",(socket)=>{
-
-  socket.on("register",(name)=>{
-    sockets[name]=socket;
-  });
-
+socket.on("register",(name)=>{
+sockets[name]=socket;
 });
+});
+
+
+/* 参加 */
 
 app.post("/join",(req,res)=>{
 
-  const {name}=req.body;
+const {name}=req.body;
 
-  if(!name) return res.send("名前なし");
+if(!game.players[name]){
 
-  if(!game.players[name]){
-    game.players[name]=game.startMoney;
-    game.trust[name]=80;
-    game.eliminated[name]=false;
-  }
+game.players[name]=game.startMoney;
+game.trust[name]=game.trustStart;
+game.eliminated[name]=false;
 
-  res.json(game);
-
-});
-
-app.post("/bet",(req,res)=>{
-
-  const {name,amount}=req.body;
-
-  if(game.eliminated[name])
-    return res.send("破産しています");
-
-  const bet = parseInt(amount)||0;
-
-  const debt = game.loans[name]?.amount || 0;
-
-  const maxBet = game.players[name] + debt;
-
-  if(bet>maxBet)
-    return res.send("賭けすぎ");
-
-  const currentBet = game.bets[name] || 0;
-
-  if(bet<currentBet)
-    return res.send("BETは減らせません");
-
-  game.bets[name]=bet;
-
-  if(!game.betHistory[name]){
-    game.betHistory[name]=[];
-  }
-
-  if(bet>0){
-    game.betHistory[name].push(bet);
-  }
-
-  res.json(game);
-
-});
-
-app.post("/loan/request",(req,res)=>{
-
-  const {name,amount}=req.body;
-
-  if(game.loans[name])
-    return res.send("借金返済後に借りてください");
-
-  const money=parseInt(amount);
-
-  if(!money || money<=0)
-    return res.send("金額エラー");
-
-  const players =
-  Object.keys(game.players).filter(p=>p!==name && !game.eliminated[p]);
-
-  const lenders =
-  players.filter(p=>game.players[p]>=money);
-
-  if(lenders.length===0)
-    return res.send("貸せる人なし");
-
-  const lender =
-  lenders[Math.floor(Math.random()*lenders.length)];
-
-  game.loanRequests[lender]={borrower:name,amount:money};
-
-  if(sockets[lender]){
-    sockets[lender].emit("loanRequest",{borrower:name,amount:money});
-  }
-
-  res.json({lender});
-
-});
-
-app.post("/loan/accept",(req,res)=>{
-
-  const {name}=req.body;
-
-  const reqLoan=game.loanRequests[name];
-
-  if(!reqLoan) return res.send("申請なし");
-
-  const {borrower,amount}=reqLoan;
-
-  if(game.players[name] < amount)
-    return res.send("貸すお金が足りません");
-
-  game.players[name]-=amount;
-  game.players[borrower]+=amount;
-
-  game.loans[borrower]={
-    lender:name,
-    amount:amount,
-    turn:game.round
-  };
-
-  delete game.loanRequests[name];
-
-  game.trust[name]+=10;
-  game.trust[borrower]-=5;
-
-  res.json(game);
-
-});
-
-app.post("/loan/reject",(req,res)=>{
-
-  const {name}=req.body;
-
-  delete game.loanRequests[name];
-
-  res.json(game);
-
-});
-
-app.post("/loan/repay",(req,res)=>{
-
-  const {name}=req.body;
-
-  const loan=game.loans[name];
-
-  if(!loan) return res.send("借金なし");
-
-  if(game.players[name] < loan.amount)
-    return res.send("所持金不足");
-
-  game.players[name]-=loan.amount;
-  game.players[loan.lender]+=loan.amount;
-
-  delete game.loans[name];
-
-  game.trust[name]+=3;
-
-  res.json(game);
-
-});
-
-app.post("/trust/exchange",(req,res)=>{
-
-  const {name}=req.body;
-
-  if(game.trust[name] < 30)
-    return res.send("信用不足");
-
-  const gain = Math.floor(game.startMoney * 0.3);
-
-  game.trust[name]-=30;
-  game.players[name]+=gain;
-
-  res.json(game);
-
-});
-
-app.post("/reset",(req,res)=>{
-
-game = {
-  players:{},
-  bets:{},
-  betHistory:{},
-  loans:{},
-  loanRequests:{},
-  trust:{},
-  eliminated:{},
-  startMoney:100,
-  minBet:5,
-  round:1
-};
+}
 
 res.json(game);
 
 });
 
-app.post("/winner",(req,res)=>{
 
-  const {name}=req.body;
+/* BET */
 
-  if(!game.bets[name]){
-    return res.send("このプレイヤーはBETしていません");
-  }
+app.post("/bet",(req,res)=>{
 
-  let pot=0;
+const {name,amount}=req.body;
 
-  for(let p in game.bets){
+if(!game.betEnabled)
+return res.send("BET停止中");
 
-    pot+=game.bets[p];
+if(game.eliminated[name] && amount>0)
+return res.send("ゲームオーバー");
 
-    game.players[p]-=game.bets[p];
+if(amount < game.minBet && amount!==0)
+return res.send("最低BET未満");
 
-  }
+const currentBet = game.bets[name] || 0;
 
-  game.players[name]+=pot;
+if(amount < currentBet)
+return res.send("BETは減らせません");
 
-  io.emit("turnEnd",{
-    winner:name,
-    amount:pot,
-    round:game.round
-  });
+if(amount > game.players[name])
+return res.send("所持金不足");
 
-  game.bets={};
-  game.betHistory={};
-  game.round++;
+game.bets[name]=amount;
 
-  checkBankruptcy();
-
-  res.json(game);
+res.json(game);
 
 });
 
-function checkBankruptcy(){
 
-  for(let p in game.players){
+/* BET受付切替 */
 
-    if(game.trust[p]<=0)
-      game.eliminated[p]=true;
+app.post("/bet/toggle",(req,res)=>{
 
-    if(game.players[p]<=0)
-      game.eliminated[p]=true;
+game.betEnabled = !game.betEnabled;
 
-    if(game.players[p] < game.minBet && !game.loans[p])
-      game.eliminated[p]=true;
+res.json(game);
 
-    const loan=game.loans[p];
+});
 
-    if(loan && game.round - loan.turn >= 30)
-      game.eliminated[p]=true;
 
-  }
+/* 借金申請 */
+
+app.post("/loan/request",(req,res)=>{
+
+const {name,amount}=req.body;
+
+if(game.loans[name])
+return res.send("借金返済後に借りてください");
+
+if(amount<=0)
+return res.send("金額エラー");
+
+const players =
+Object.keys(game.players)
+.filter(p=>p!==name && game.players[p]>=amount);
+
+if(players.length===0)
+return res.send("貸せる人なし");
+
+const lender =
+players[Math.floor(Math.random()*players.length)];
+
+game.loanRequests[lender]={borrower:name,amount};
+
+if(sockets[lender]){
+sockets[lender].emit("loanRequest",{borrower:name,amount});
+}
+
+res.json({lender});
+
+});
+
+
+/* 借金承認 */
+
+app.post("/loan/accept",(req,res)=>{
+
+const {name}=req.body;
+
+const reqLoan=game.loanRequests[name];
+
+if(!reqLoan) return res.send("申請なし");
+
+const {borrower,amount}=reqLoan;
+
+if(game.players[name] < amount)
+return res.send("貸すお金不足");
+
+game.players[name]-=amount;
+game.players[borrower]+=amount;
+
+game.loans[borrower]={lender:name,amount};
+
+delete game.loanRequests[name];
+
+game.trust[name]+=10;
+game.trust[borrower]-=5;
+
+res.json(game);
+
+});
+
+
+/* 借金拒否 */
+
+app.post("/loan/reject",(req,res)=>{
+
+const {name}=req.body;
+
+delete game.loanRequests[name];
+
+res.json(game);
+
+});
+
+
+/* 返済 */
+
+app.post("/loan/repay",(req,res)=>{
+
+const {name}=req.body;
+
+const loan=game.loans[name];
+
+if(!loan) return res.send("借金なし");
+
+if(game.players[name] < loan.amount)
+return res.send("所持金不足");
+
+game.players[name]-=loan.amount;
+game.players[loan.lender]+=loan.amount;
+
+delete game.loans[name];
+
+game.trust[name]+=3;
+
+res.json(game);
+
+});
+
+
+/* 信用換金 */
+
+app.post("/trust/exchange",(req,res)=>{
+
+const {name}=req.body;
+
+if(game.trust[name] < game.trustCost)
+return res.send("信用不足");
+
+const gain = Math.floor(game.startMoney * game.trustPercent);
+
+game.trust[name]-=game.trustCost;
+game.players[name]+=gain;
+
+res.json(game);
+
+});
+
+
+/* 勝者 */
+
+app.post("/winner",(req,res)=>{
+
+const {name}=req.body;
+
+if(!game.bets[name])
+return res.send("BETしていません");
+
+let pot=0;
+
+for(let p in game.bets){
+
+pot+=game.bets[p];
+game.players[p]-=game.bets[p];
 
 }
 
+game.players[name]+=pot;
+
+io.emit("turnEnd",{
+winner:name,
+amount:pot,
+round:game.round
+});
+
+game.bets={};
+game.round++;
+
+res.json(game);
+
+});
+
+
+/* 設定保存 */
+
+app.post("/settings",(req,res)=>{
+
+const {
+startMoney,
+trustStart,
+trustCost,
+trustPercent,
+minBet
+} = req.body;
+
+if(startMoney!==undefined)
+game.startMoney=Number(startMoney);
+
+if(trustStart!==undefined)
+game.trustStart=Number(trustStart);
+
+if(trustCost!==undefined)
+game.trustCost=Number(trustCost);
+
+if(trustPercent!==undefined)
+game.trustPercent=Number(trustPercent);
+
+if(minBet!==undefined)
+game.minBet=Number(minBet);
+
+res.json(game);
+
+});
+
+
+/* リセット */
+
+app.post("/reset",(req,res)=>{
+
+game.players={};
+game.bets={};
+game.loans={};
+game.loanRequests={};
+game.trust={};
+game.eliminated={};
+game.round=1;
+
+res.json(game);
+
+});
+
+
+/* 状態 */
+
 app.get("/state",(req,res)=>{
-  res.json(game);
+res.json(game);
 });
 
 
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT,()=>{
-  console.log("Server running on port " + PORT);
+console.log("Server running on port "+PORT);
 });
