@@ -38,15 +38,13 @@ font-size:16px;
 
 <input id="newPlayerName" placeholder="名前">
 
-<button onclick="addPlayer()">プレイヤー追加</button>
+<button onclick="addPlayer()">追加</button>
 
 </div>
 
 <div class="card">
 
 <h3>QRコード</h3>
-
-<button onclick="showQR()">QR表示</button>
 
 <div id="qr"></div>
 
@@ -64,21 +62,20 @@ font-size:16px;
 
 <div class="card">
 
+<h3>BETプレイヤー</h3>
+
+<div id="bets"></div>
+
+</div>
+
+<div class="card">
+
 <h3>ゲーム設定</h3>
 
-初期資金<br>
 <input id="startMoney"><br>
-
-信用初期値<br>
 <input id="trustStart"><br>
-
-信用換金コスト<br>
 <input id="trustCost"><br>
-
-信用換金％<br>
 <input id="trustPercent"><br>
-
-最低BET<br>
 <input id="minBet"><br>
 
 <button onclick="saveSettings()">保存</button>
@@ -93,21 +90,77 @@ font-size:16px;
 
 <script>
 
-function showQR(){
+function loadState(){
 
-const url=location.origin+"/player.html";
+fetch("/state")
+.then(r=>r.json())
+.then(data=>{
+
+round.textContent=data.round;
+
+let pot=0;
+for(let p in data.bets) pot+=data.bets[p];
+document.getElementById("pot").textContent=pot;
+
+betState.textContent=data.betEnabled?"可能":"不可能";
+
+players.innerHTML="";
+
+for(let p of data.allowedPlayers){
+
+const div=document.createElement("div");
+
+const online=data.online[p];
+
+const btn=document.createElement("button");
+btn.textContent="QR";
+
+btn.onclick=()=>{
+
+const url=location.origin+"/player.html?name="+p;
 
 qr.innerHTML=
-"<img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+url+"'>";
+"<h3>"+p+"</h3>"+
+"<img src='https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+url+"'>";
+
+};
+
+div.textContent=p+" "+(online?"🟢":"🔴")+" ";
+div.appendChild(btn);
+
+players.appendChild(div);
 
 }
 
-function resetGame(){
-fetch("/reset",{method:"POST"});
+bets.innerHTML="";
+
+for(let p in data.bets){
+
+const div=document.createElement("div");
+
+div.textContent=p+" (BET "+data.bets[p]+") ";
+
+const btn=document.createElement("button");
+
+btn.textContent="勝者";
+
+btn.onclick=()=>{
+
+fetch("/winner",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:p})
+});
+
+};
+
+div.appendChild(btn);
+bets.appendChild(div);
+
 }
 
-function toggleBet(){
-fetch("/bet/toggle",{method:"POST"});
+});
+
 }
 
 function addPlayer(){
@@ -118,6 +171,14 @@ headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:newPlayerName.value})
 });
 
+}
+
+function toggleBet(){
+fetch("/bet/toggle",{method:"POST"});
+}
+
+function resetGame(){
+fetch("/reset",{method:"POST"});
 }
 
 function saveSettings(){
@@ -137,6 +198,8 @@ minBet:minBet.value
 });
 
 }
+
+setInterval(loadState,1000);
 
 </script>
 

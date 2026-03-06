@@ -40,6 +40,7 @@ betEnabled:true
 io.on("connection",(socket)=>{
 
 socket.on("register",(name)=>{
+
 sockets[name]=socket;
 game.online[name]=true;
 
@@ -283,7 +284,7 @@ res.json(game);
 
 });
 
-/* ゲーム設定 */
+/* 設定 */
 
 app.post("/settings",(req,res)=>{
 
@@ -299,7 +300,7 @@ res.json(game);
 
 });
 
-/* ゲームリセット */
+/* リセット */
 
 app.post("/reset",(req,res)=>{
 
