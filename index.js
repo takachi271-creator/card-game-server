@@ -14,8 +14,11 @@ let sockets = {};
 let game = {
 players:{},
 bets:{},
+betHistory:{},
+
 loans:{},
 loanRequests:{},
+
 trust:{},
 eliminated:{},
 
@@ -48,6 +51,7 @@ if(!game.players[name]){
 game.players[name]=game.startMoney;
 game.trust[name]=game.trustStart;
 game.eliminated[name]=false;
+game.betHistory[name]=[];
 
 }
 
@@ -90,14 +94,14 @@ res.json(game);
 
 app.post("/bet/toggle",(req,res)=>{
 
-game.betEnabled = !game.betEnabled;
+game.betEnabled=!game.betEnabled;
 
 res.json(game);
 
 });
 
 
-/* 借金申請 */
+/* 借金 */
 
 app.post("/loan/request",(req,res)=>{
 
@@ -106,17 +110,14 @@ const {name,amount}=req.body;
 if(game.loans[name])
 return res.send("借金返済後に借りてください");
 
-if(amount<=0)
-return res.send("金額エラー");
-
-const players =
+const players=
 Object.keys(game.players)
 .filter(p=>p!==name && game.players[p]>=amount);
 
 if(players.length===0)
 return res.send("貸せる人なし");
 
-const lender =
+const lender=
 players[Math.floor(Math.random()*players.length)];
 
 game.loanRequests[lender]={borrower:name,amount};
@@ -130,8 +131,6 @@ res.json({lender});
 });
 
 
-/* 借金承認 */
-
 app.post("/loan/accept",(req,res)=>{
 
 const {name}=req.body;
@@ -141,9 +140,6 @@ const reqLoan=game.loanRequests[name];
 if(!reqLoan) return res.send("申請なし");
 
 const {borrower,amount}=reqLoan;
-
-if(game.players[name] < amount)
-return res.send("貸すお金不足");
 
 game.players[name]-=amount;
 game.players[borrower]+=amount;
@@ -160,8 +156,6 @@ res.json(game);
 });
 
 
-/* 借金拒否 */
-
 app.post("/loan/reject",(req,res)=>{
 
 const {name}=req.body;
@@ -172,8 +166,6 @@ res.json(game);
 
 });
 
-
-/* 返済 */
 
 app.post("/loan/repay",(req,res)=>{
 
@@ -207,7 +199,7 @@ const {name}=req.body;
 if(game.trust[name] < game.trustCost)
 return res.send("信用不足");
 
-const gain = Math.floor(game.startMoney * game.trustPercent);
+const gain=Math.floor(game.startMoney * game.trustPercent);
 
 game.trust[name]-=game.trustCost;
 game.players[name]+=gain;
@@ -237,6 +229,22 @@ game.players[p]-=game.bets[p];
 
 game.players[name]+=pot;
 
+
+/* BET履歴保存 */
+
+for(let p in game.bets){
+
+if(!game.betHistory[p])
+game.betHistory[p]=[];
+
+game.betHistory[p].push({
+round:game.round,
+amount:game.bets[p]
+});
+
+}
+
+
 io.emit("turnEnd",{
 winner:name,
 amount:pot,
@@ -251,7 +259,7 @@ res.json(game);
 });
 
 
-/* 設定保存 */
+/* 設定 */
 
 app.post("/settings",(req,res)=>{
 
@@ -261,7 +269,7 @@ trustStart,
 trustCost,
 trustPercent,
 minBet
-} = req.body;
+}=req.body;
 
 if(startMoney!==undefined)
 game.startMoney=Number(startMoney);
@@ -289,6 +297,7 @@ app.post("/reset",(req,res)=>{
 
 game.players={};
 game.bets={};
+game.betHistory={};
 game.loans={};
 game.loanRequests={};
 game.trust={};
