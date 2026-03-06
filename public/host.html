@@ -11,19 +11,27 @@ background:#111;
 color:white;
 font-family:sans-serif;
 text-align:center;
+margin:0;
 }
 
 .card{
-background:#222;
-padding:10px;
-margin:10px;
-border-radius:10px;
+background:#1c1c1c;
+margin:12px;
+padding:14px;
+border-radius:12px;
 }
 
 button,input{
 padding:10px;
-margin:6px;
 font-size:16px;
+margin:6px;
+border:none;
+border-radius:8px;
+}
+
+button{
+background:#2ecc71;
+color:white;
 }
 
 #qrPopup{
@@ -32,9 +40,14 @@ top:50%;
 left:50%;
 transform:translate(-50%,-50%);
 background:#000;
-padding:20px;
-border-radius:12px;
+padding:25px;
+border-radius:14px;
 display:none;
+z-index:999;
+}
+
+#qrcode{
+margin:10px;
 }
 
 </style>
@@ -44,6 +57,7 @@ display:none;
 <body>
 
 <h2>ホスト管理</h2>
+
 
 <div class="card">
 
@@ -60,11 +74,15 @@ display:none;
 
 <div class="card">
 
-ラウンド : <span id="round"></span><br>
-POT : <span id="pot"></span><br>
-BET状態 : <span id="betState"></span>
+<h3>ゲーム状況</h3>
 
-<br>
+<p>ラウンド : <span id="round"></span></p>
+
+<p>POT : <span id="pot"></span></p>
+
+<p>BET状態 :
+<span id="betState"></span>
+</p>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
@@ -88,10 +106,19 @@ BET状態 : <span id="betState"></span>
 
 
 <div id="qrPopup">
+
 <h3 id="qrTitle"></h3>
+
 <div id="qrcode"></div>
+
+<p id="qrUrl"></p>
+
+<button onclick="copyURL()">URLコピー</button>
+
 <br>
+
 <button onclick="closeQR()">閉じる</button>
+
 </div>
 
 
@@ -99,13 +126,18 @@ BET状態 : <span id="betState"></span>
 
 <script>
 
+
 function loadState(){
 
 fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
+
 round.textContent=data.round;
+
+
+/* POT */
 
 let pot=0;
 
@@ -113,11 +145,17 @@ for(let p in data.bets){
 pot+=data.bets[p];
 }
 
-pot?pot:0;
+pot ? pot : 0;
 
 document.getElementById("pot").textContent=pot;
 
+
+/* BET状態 */
+
 betState.textContent=data.betEnabled?"可能":"不可能";
+
+
+/* プレイヤー一覧 */
 
 players.innerHTML="";
 
@@ -127,19 +165,23 @@ const div=document.createElement("div");
 
 const online=data.online[p];
 
-const btn=document.createElement("button");
+const qrBtn=document.createElement("button");
 
-btn.textContent="QRを表示";
+qrBtn.textContent="QRを表示";
 
-btn.onclick=()=>showQR(p);
+qrBtn.onclick=()=>showQR(p);
+
 
 div.textContent=p+" "+(online?"🟢":"🔴")+" ";
 
-div.appendChild(btn);
+div.appendChild(qrBtn);
 
 players.appendChild(div);
 
 }
+
+
+/* BET一覧 */
 
 bets.innerHTML="";
 
@@ -174,13 +216,19 @@ bets.appendChild(div);
 }
 
 
+/* QR表示 */
+
 function showQR(name){
 
-const url=
-window.location.origin+
-"/player.html?name="+name;
+const url =
+window.location.origin +
+"/player.html?name=" +
+encodeURIComponent(name);
 
-document.getElementById("qrTitle").textContent=name+" のQR";
+document.getElementById("qrTitle").textContent =
+name+" の参加QR";
+
+document.getElementById("qrUrl").textContent=url;
 
 const qr=document.getElementById("qrcode");
 
@@ -197,10 +245,29 @@ document.getElementById("qrPopup").style.display="block";
 }
 
 
+/* QR閉じる */
+
 function closeQR(){
+
 document.getElementById("qrPopup").style.display="none";
+
 }
 
+
+/* URLコピー */
+
+function copyURL(){
+
+const text=document.getElementById("qrUrl").textContent;
+
+navigator.clipboard.writeText(text);
+
+alert("URLコピーしました");
+
+}
+
+
+/* プレイヤー追加 */
 
 function addPlayer(){
 
@@ -210,18 +277,27 @@ fetch("/player/add",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name})
-}).then(loadState);
+})
+.then(loadState);
 
 }
 
+
+/* BET切替 */
 
 function toggleBet(){
+
 fetch("/bet/toggle",{method:"POST"});
+
 }
 
 
+/* リセット */
+
 function resetGame(){
+
 fetch("/reset",{method:"POST"});
+
 }
 
 
