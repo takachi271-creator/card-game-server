@@ -16,6 +16,7 @@ let game = {
 players:{},
 bets:{},
 betHistory:{},
+turnHistory:[],
 
 loans:{},
 loanRequests:{},
@@ -66,8 +67,6 @@ return 0;
 
 }
 
-/* プレイヤー追加 */
-
 app.post("/player/add",(req,res)=>{
 
 const {name}=req.body;
@@ -79,7 +78,19 @@ res.json(game);
 
 });
 
-/* 参加 */
+app.post("/player/reset",(req,res)=>{
+
+const {name}=req.body;
+
+delete game.players[name];
+delete game.bets[name];
+delete game.trust[name];
+delete game.loans[name];
+delete game.betHistory[name];
+
+res.json(game);
+
+});
 
 app.post("/join",(req,res)=>{
 
@@ -100,8 +111,6 @@ game.loanUsed[name]=false;
 res.json(game);
 
 });
-
-/* BET */
 
 app.post("/bet",(req,res)=>{
 
@@ -127,8 +136,6 @@ res.json(game);
 
 });
 
-/* BET受付切替 */
-
 app.post("/bet/toggle",(req,res)=>{
 
 game.betEnabled=!game.betEnabled;
@@ -136,8 +143,6 @@ game.betEnabled=!game.betEnabled;
 res.json(game);
 
 });
-
-/* 借金 */
 
 app.post("/loan/request",(req,res)=>{
 
@@ -218,8 +223,6 @@ res.json(game);
 
 });
 
-/* 信用換金 */
-
 app.post("/trust/exchange",(req,res)=>{
 
 const {name}=req.body;
@@ -235,8 +238,6 @@ game.players[name]+=gain;
 res.json(game);
 
 });
-
-/* 勝者 */
 
 app.post("/winner",(req,res)=>{
 
@@ -255,6 +256,12 @@ game.players[p]-=game.bets[p];
 }
 
 game.players[name]+=pot;
+
+game.turnHistory.push({
+round:game.round,
+winner:name,
+amount:pot
+});
 
 for(let p in game.bets){
 
@@ -284,8 +291,6 @@ res.json(game);
 
 });
 
-/* 設定 */
-
 app.post("/settings",(req,res)=>{
 
 const {startMoney,trustStart,trustCost,trustPercent,minBet}=req.body;
@@ -300,13 +305,12 @@ res.json(game);
 
 });
 
-/* リセット */
-
 app.post("/reset",(req,res)=>{
 
 game.players={};
 game.bets={};
 game.betHistory={};
+game.turnHistory=[];
 game.loans={};
 game.loanRequests={};
 game.trust={};

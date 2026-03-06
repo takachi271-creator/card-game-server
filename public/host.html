@@ -5,25 +5,28 @@
 <title>Host</title>
 
 <style>
+
 body{
 background:#111;
 color:white;
 font-family:sans-serif;
 text-align:center;
 }
+
 .card{
 background:#1c1c1c;
 padding:14px;
 margin:12px;
 border-radius:12px;
 }
+
 button,input{
 padding:10px;
 margin:6px;
 font-size:16px;
 }
-</style>
 
+</style>
 </head>
 
 <body>
@@ -37,14 +40,13 @@ font-size:16px;
 <div id="players"></div>
 
 <input id="newPlayerName" placeholder="名前">
-
 <button onclick="addPlayer()">追加</button>
 
 </div>
 
 <div class="card">
 
-<h3>QRコード</h3>
+<h3>QR</h3>
 
 <div id="qr"></div>
 
@@ -54,7 +56,7 @@ font-size:16px;
 
 <p>ラウンド : <span id="round"></span></p>
 <p>POT : <span id="pot"></span></p>
-<p>BET状態 : <span id="betState"></span></p>
+<p>BET : <span id="betState"></span></p>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
@@ -70,15 +72,9 @@ font-size:16px;
 
 <div class="card">
 
-<h3>ゲーム設定</h3>
+<h3>ターン履歴</h3>
 
-<input id="startMoney"><br>
-<input id="trustStart"><br>
-<input id="trustCost"><br>
-<input id="trustPercent"><br>
-<input id="minBet"><br>
-
-<button onclick="saveSettings()">保存</button>
+<div id="history"></div>
 
 </div>
 
@@ -99,7 +95,9 @@ fetch("/state")
 round.textContent=data.round;
 
 let pot=0;
+
 for(let p in data.bets) pot+=data.bets[p];
+
 document.getElementById("pot").textContent=pot;
 
 betState.textContent=data.betEnabled?"可能":"不可能";
@@ -112,21 +110,35 @@ const div=document.createElement("div");
 
 const online=data.online[p];
 
-const btn=document.createElement("button");
-btn.textContent="QR";
+const qrBtn=document.createElement("button");
+qrBtn.textContent="QR";
 
-btn.onclick=()=>{
+qrBtn.onclick=()=>{
 
 const url=location.origin+"/player.html?name="+p;
 
 qr.innerHTML=
 "<h3>"+p+"</h3>"+
-"<img src='https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+url+"'>";
+"<img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+url+"'>";
+
+};
+
+const resetBtn=document.createElement("button");
+resetBtn.textContent="リセット";
+
+resetBtn.onclick=()=>{
+
+fetch("/player/reset",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:p})
+});
 
 };
 
 div.textContent=p+" "+(online?"🟢":"🔴")+" ";
-div.appendChild(btn);
+div.appendChild(qrBtn);
+div.appendChild(resetBtn);
 
 players.appendChild(div);
 
@@ -141,7 +153,6 @@ const div=document.createElement("div");
 div.textContent=p+" (BET "+data.bets[p]+") ";
 
 const btn=document.createElement("button");
-
 btn.textContent="勝者";
 
 btn.onclick=()=>{
@@ -155,7 +166,21 @@ body:JSON.stringify({name:p})
 };
 
 div.appendChild(btn);
+
 bets.appendChild(div);
+
+}
+
+history.innerHTML="";
+
+for(let h of data.turnHistory.slice().reverse()){
+
+const div=document.createElement("div");
+
+div.textContent=
+"Round "+h.round+" : "+h.winner+" +"+h.amount;
+
+history.appendChild(div);
 
 }
 
@@ -179,24 +204,6 @@ fetch("/bet/toggle",{method:"POST"});
 
 function resetGame(){
 fetch("/reset",{method:"POST"});
-}
-
-function saveSettings(){
-
-fetch("/settings",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-
-startMoney:startMoney.value,
-trustStart:trustStart.value,
-trustCost:trustCost.value,
-trustPercent:trustPercent.value,
-minBet:minBet.value
-
-})
-});
-
 }
 
 setInterval(loadState,1000);
