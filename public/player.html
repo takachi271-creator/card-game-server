@@ -91,13 +91,16 @@ z-index:999;
 
 <div id="playerNameTitle"></div>
 
+
 <div class="card">
 
 <p>💰 所持金: <span id="money">0</span></p>
 
 <p>💳 借金: <span id="debt">なし</span></p>
 
-<p>⭐ 信用: <span id="trustValue">0</span></p>
+<p id="gameOver" style="color:red;font-weight:bold;display:none;">
+破産しました
+</p>
 
 </div>
 
@@ -112,7 +115,10 @@ z-index:999;
 
 <p>最低BET : <span id="minBet">0</span></p>
 
-<p>現在BET : <span id="betStatus"></span></p>
+<p>
+BET状態 :
+<span id="betState">可能</span>
+</p>
 
 </div>
 
@@ -121,19 +127,16 @@ z-index:999;
 
 <h3>⭐ 信用ポイント</h3>
 
-<p>現在</p>
+<p style="text-align:center;">現在</p>
 
-<p style="font-size:30px;text-align:center;">
-<span id="trustNow">0</span>
+<p id="trustValue"
+style="font-size:30px;font-weight:bold;text-align:center;">
+0
 </p>
 
-<p>
-通知成功率 : <span id="trustChance">0%</span>
-</p>
-
-<p>
-換金 : 信用<span id="trustCost">30</span>
-→ +<span id="trustGain">30</span>
+<p style="text-align:center;">
+通知成功率 :
+<span id="trustChance">0%</span>
 </p>
 
 <button onclick="exchangeTrust()">
@@ -147,7 +150,12 @@ z-index:999;
 
 <h3>BET</h3>
 
-<input id="betAmount" type="number" placeholder="BET金額">
+<input id="betAmount" type="number" placeholder="BET">
+
+<p>
+現在倍率 :
+<span id="multiplier">1.2x</span>
+</p>
 
 <button onclick="bet()">ベット</button>
 
@@ -163,15 +171,6 @@ z-index:999;
 <button onclick="requestLoan()">借りる</button>
 
 <div id="repayArea"></div>
-
-</div>
-
-
-<div class="card">
-
-<h3>BET履歴</h3>
-
-<div id="betHistory"></div>
 
 </div>
 
@@ -195,25 +194,78 @@ const socket = io();
 let currentName="";
 
 
+/* ⭐ QR自動参加 */
+
+const params = new URLSearchParams(location.search);
+const autoName = params.get("name");
+
+if(autoName){
+
+window.onload=()=>{
+
+document.getElementById("playerName").value = autoName;
+
+setTimeout(()=>{
+joinGame();
+},300);
+
+};
+
+}
+
+
+/* 倍率計算 */
+
+function calcMultiplier(amount,startMoney){
+
+const percent=(amount/startMoney)*100;
+
+if(percent>=500) return 5;
+if(percent>=200) return 3;
+if(percent>=150) return 2;
+if(percent>=100) return 1.9;
+if(percent>=75) return 1.8;
+if(percent>=50) return 1.5;
+if(percent>=20) return 1.4;
+
+return 1.2;
+
+}
+
+
+/* 参加 */
+
 function joinGame(){
 
-const name=playerName.value;
+const name=document.getElementById("playerName").value;
 
 fetch("/join",{
+
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name})
+
 })
-.then(()=>{
+
+.then(res=>res.json())
+
+.then(data=>{
+
+if(data.error){
+
+alert("この名前は登録されていません");
+return;
+
+}
 
 currentName=name;
 
 socket.emit("register",currentName);
 
-lobby.style.display="none";
-game.style.display="block";
+document.getElementById("lobby").style.display="none";
+document.getElementById("game").style.display="block";
 
-playerNameTitle.textContent=currentName;
+document.getElementById("playerNameTitle").textContent=currentName;
 
 loadState();
 
@@ -226,14 +278,15 @@ loadState();
 
 function bet(){
 
-const amount=parseInt(betAmount.value)||0;
+const amount=parseInt(document.getElementById("betAmount").value)||0;
 
 fetch("/bet",{
+
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
-})
-.then(loadState);
+
+}).then(loadState);
 
 }
 
@@ -242,12 +295,14 @@ body:JSON.stringify({name:currentName,amount})
 
 function requestLoan(){
 
-const amount=parseInt(loanAmount.value)||0;
+const amount=parseInt(document.getElementById("loanAmount").value);
 
 fetch("/loan/request",{
+
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName,amount})
+
 });
 
 }
@@ -258,13 +313,66 @@ body:JSON.stringify({name:currentName,amount})
 function exchangeTrust(){
 
 fetch("/trust/exchange",{
+
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name:currentName})
-})
-.then(loadState);
+
+}).then(loadState);
 
 }
+
+
+/* 借金通知 */
+
+socket.on("loanRequest",(data)=>{
+
+if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
+
+fetch("/loan/accept",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+
+});
+
+}else{
+
+fetch("/loan/reject",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+
+});
+
+}
+
+});
+
+
+/* 勝者表示 */
+
+socket.on("turnEnd",(data)=>{
+
+const popup=document.getElementById("winnerPopup");
+
+popup.innerHTML=
+"🏆 勝者<br><br>"+
+data.winner+
+"<br><br>+"+
+data.amount;
+
+popup.style.display="block";
+
+setTimeout(()=>{
+popup.style.display="none";
+},2000);
+
+loadState();
+
+});
 
 
 /* 状態更新 */
@@ -272,16 +380,29 @@ body:JSON.stringify({name:currentName})
 function loadState(){
 
 fetch("/state")
+
 .then(r=>r.json())
+
 .then(data=>{
 
-money.textContent=data.players[currentName]||0;
+document.getElementById("money").textContent=Math.floor(data.players[currentName]);
 
-round.textContent=data.round;
+const loan=data.loans[currentName];
 
-minBet.textContent=data.minBet;
+document.getElementById("debt").textContent=loan?loan.amount:"なし";
 
-betStatus.textContent=data.betEnabled?"可能":"不可能";
+document.getElementById("round").textContent=data.round;
+
+document.getElementById("minBet").textContent=data.minBet;
+
+
+/* BET状態 */
+
+document.getElementById("betState").textContent =
+data.betEnabled ? "可能" : "不可能";
+
+
+/* POT */
 
 let pot=0;
 
@@ -292,22 +413,21 @@ pot+=data.bets[p];
 document.getElementById("pot").textContent=pot;
 
 
+/* 倍率 */
+
+const myBet=data.bets[currentName]||0;
+
+document.getElementById("multiplier").textContent =
+myBet>0
+?calcMultiplier(myBet,data.startMoney)+"x"
+:"1.2x";
+
+
 /* 信用 */
 
 const trust=data.trust[currentName]||0;
 
-trustValue.textContent=trust;
-
-trustNow.textContent=trust;
-
-trustCost.textContent=data.trustCost;
-
-const gain=Math.floor(data.startMoney * data.trustPercent);
-
-trustGain.textContent=gain;
-
-
-/* 成功率 */
+document.getElementById("trustValue").textContent=trust;
 
 let chance=0;
 
@@ -319,28 +439,41 @@ else if(trust>=30) chance=30;
 else if(trust>=10) chance=10;
 else if(trust>=1) chance=5;
 
-trustChance.textContent=chance+"%";
+document.getElementById("trustChance").textContent=chance+"%";
 
 
-/* BET履歴 */
+/* 返済 */
 
-betHistory.innerHTML="";
+const repayArea=document.getElementById("repayArea");
 
-const history=data.betHistory[currentName]||[];
+repayArea.innerHTML="";
 
-history.slice(-5).reverse().forEach(h=>{
+if(loan){
 
-const div=document.createElement("div");
+const btn=document.createElement("button");
 
-div.textContent=
-"Round "+h.round+" : "+h.amount;
+btn.textContent="全額返済";
 
-betHistory.appendChild(div);
+btn.onclick=()=>{
 
-});
+fetch("/loan/repay",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name:currentName})
+
+}).then(loadState);
+
+};
+
+repayArea.appendChild(btn);
+
+}
 
 
 /* プレイヤー一覧 */
+
+const playerList=document.getElementById("playerList");
 
 playerList.innerHTML="";
 
@@ -348,11 +481,11 @@ for(let p in data.players){
 
 const div=document.createElement("div");
 
-div.textContent=
-p+" 💰"+Math.floor(data.players[p]);
+div.className=data.bets[p]?"betActive":"";
 
-if(data.bets[p])
-div.textContent+=" (BET "+data.bets[p]+")";
+div.textContent =
+p+" : "+Math.floor(data.players[p])+
+(data.bets[p]?" (BET "+data.bets[p]+")":"");
 
 playerList.appendChild(div);
 
@@ -364,49 +497,6 @@ playerList.appendChild(div);
 
 
 setInterval(loadState,1000);
-
-
-/* 借金通知 */
-
-socket.on("loanRequest",(data)=>{
-
-if(confirm(data.borrower+" が "+data.amount+" 借りたい\n貸しますか？")){
-
-fetch("/loan/accept",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-});
-
-}else{
-
-fetch("/loan/reject",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:currentName})
-});
-
-}
-
-});
-
-
-/* 勝者通知 */
-
-socket.on("turnEnd",(data)=>{
-
-winnerPopup.innerHTML=
-"🏆 "+data.winner+" 勝利<br>+"+data.amount;
-
-winnerPopup.style.display="block";
-
-setTimeout(()=>{
-winnerPopup.style.display="none";
-},2000);
-
-loadState();
-
-});
 
 </script>
 
