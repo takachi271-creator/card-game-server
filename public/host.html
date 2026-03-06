@@ -13,17 +13,28 @@ font-family:sans-serif;
 text-align:center;
 }
 
-input,button{
-padding:10px;
-margin:6px;
-font-size:16px;
-}
-
 .card{
 background:#222;
 padding:10px;
 margin:10px;
 border-radius:10px;
+}
+
+button,input{
+padding:10px;
+margin:6px;
+font-size:16px;
+}
+
+#qrPopup{
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:#000;
+padding:20px;
+border-radius:12px;
+display:none;
 }
 
 </style>
@@ -40,11 +51,12 @@ border-radius:10px;
 
 <div id="players"></div>
 
-<input id="newPlayerName" placeholder="名前を入力">
+<input id="newPlayerName" placeholder="名前">
 
 <button onclick="addPlayer()">プレイヤーを追加</button>
 
 </div>
+
 
 <div class="card">
 
@@ -58,6 +70,7 @@ BET状態 : <span id="betState"></span>
 
 </div>
 
+
 <div class="card">
 
 <h3>BETプレイヤー</h3>
@@ -66,11 +79,23 @@ BET状態 : <span id="betState"></span>
 
 </div>
 
+
 <div class="card">
 
 <button onclick="resetGame()">ゲームリセット</button>
 
 </div>
+
+
+<div id="qrPopup">
+<h3 id="qrTitle"></h3>
+<div id="qrcode"></div>
+<br>
+<button onclick="closeQR()">閉じる</button>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
 
@@ -88,6 +113,8 @@ for(let p in data.bets){
 pot+=data.bets[p];
 }
 
+pot?pot:0;
+
 document.getElementById("pot").textContent=pot;
 
 betState.textContent=data.betEnabled?"可能":"不可能";
@@ -100,8 +127,15 @@ const div=document.createElement("div");
 
 const online=data.online[p];
 
-div.textContent=
-p + (online ? " 🟢" : " 🔴");
+const btn=document.createElement("button");
+
+btn.textContent="QRを表示";
+
+btn.onclick=()=>showQR(p);
+
+div.textContent=p+" "+(online?"🟢":"🔴")+" ";
+
+div.appendChild(btn);
 
 players.appendChild(div);
 
@@ -140,6 +174,34 @@ bets.appendChild(div);
 }
 
 
+function showQR(name){
+
+const url=
+window.location.origin+
+"/player.html?name="+name;
+
+document.getElementById("qrTitle").textContent=name+" のQR";
+
+const qr=document.getElementById("qrcode");
+
+qr.innerHTML="";
+
+new QRCode(qr,{
+text:url,
+width:200,
+height:200
+});
+
+document.getElementById("qrPopup").style.display="block";
+
+}
+
+
+function closeQR(){
+document.getElementById("qrPopup").style.display="none";
+}
+
+
 function addPlayer(){
 
 const name=newPlayerName.value;
@@ -154,16 +216,12 @@ body:JSON.stringify({name})
 
 
 function toggleBet(){
-
 fetch("/bet/toggle",{method:"POST"});
-
 }
 
 
 function resetGame(){
-
 fetch("/reset",{method:"POST"});
-
 }
 
 
