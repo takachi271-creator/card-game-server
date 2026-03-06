@@ -10,20 +10,43 @@ body{
 background:#111;
 color:white;
 font-family:sans-serif;
-text-align:center;
+margin:0;
+}
+
+.container{
+max-width:900px;
+margin:auto;
+padding:20px;
 }
 
 .card{
 background:#1c1c1c;
-padding:12px;
-margin:10px;
-border-radius:10px;
+padding:16px;
+border-radius:12px;
+margin-bottom:16px;
 }
 
 button{
-padding:10px;
-margin:5px;
+padding:10px 16px;
+margin:6px;
+border:none;
+border-radius:8px;
+background:#3498db;
+color:white;
 font-size:16px;
+}
+
+input{
+padding:8px;
+font-size:16px;
+margin:4px;
+}
+
+.qr{
+background:white;
+padding:6px;
+margin:6px;
+display:inline-block;
 }
 
 </style>
@@ -32,22 +55,54 @@ font-size:16px;
 
 <body>
 
-<h1>HOST</h1>
+<div class="container">
+
+<h1>HOST管理</h1>
 
 <div class="card">
 
 <h3>プレイヤー登録</h3>
 
-<input id="newPlayer">
+<input id="newPlayer" placeholder="名前">
+
 <button onclick="addPlayer()">追加</button>
 
-<div id="players"></div>
+<div id="playerRegisterList"></div>
 
 </div>
 
+
 <div class="card">
 
-<h3>ゲーム管理</h3>
+<h3>ゲーム設定</h3>
+
+初期資金  
+<input id="setMoney" type="number">
+
+信用初期  
+<input id="setTrust" type="number">
+
+信用換金  
+<input id="setExchange" type="number">
+
+換金割合  
+<input id="setPercent" step="0.1" type="number">
+
+最低BET  
+<input id="setMinBet" type="number">
+
+<br>
+
+<button onclick="saveSettings()">保存</button>
+
+<div id="settingView"></div>
+
+</div>
+
+
+<div class="card">
+
+<h3>ゲーム操作</h3>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
@@ -55,19 +110,33 @@ font-size:16px;
 
 </div>
 
+
 <div class="card">
 
 <h3>勝者選択</h3>
 
-<div id="winnerList"></div>
+<div id="winnerButtons"></div>
 
 </div>
+
+
+<div class="card">
+
+<h3>他ゲーム操作</h3>
+
+<div id="otherGame"></div>
+
+</div>
+
 
 <div class="card">
 
 <h3>ターン履歴</h3>
 
-<div id="history"></div>
+<div id="turnHistory"></div>
+
+</div>
+
 
 </div>
 
@@ -76,20 +145,83 @@ font-size:16px;
 function addPlayer(){
 
 fetch("/host/addPlayer",{
+
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
 name:document.getElementById("newPlayer").value
 })
-})
+
+}).then(loadState)
 
 }
+
+
+function saveSettings(){
+
+fetch("/host/settings",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+
+startMoney:setMoney.value,
+startTrust:setTrust.value,
+trustExchange:setExchange.value,
+trustPercent:setPercent.value,
+minBet:setMinBet.value
+
+})
+
+}).then(loadState)
+
+}
+
+
+function toggleBet(){
+
+fetch("/host/betToggle",{method:"POST"})
+.then(loadState)
+
+}
+
 
 function resetGame(){
 
 fetch("/host/reset",{method:"POST"})
+.then(loadState)
 
 }
+
+
+function chooseWinner(name){
+
+fetch("/winner",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name})
+
+}).then(loadState)
+
+}
+
+
+function betAction(name,type){
+
+fetch("/bet/result",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+name:name,
+type:type
+})
+
+}).then(loadState)
+
+}
+
 
 function loadState(){
 
@@ -97,24 +229,41 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
-const p=document.getElementById("players")
 
-p.innerHTML=""
+// プレイヤー登録
 
-for(let name of data.allowedPlayers){
+const reg=document.getElementById("playerRegisterList")
+
+reg.innerHTML=""
+
+data.allowedPlayers.forEach(name=>{
 
 const div=document.createElement("div")
 
-div.innerHTML=name+
-(data.online[name]?" 🟢":" ⚫")
+div.innerHTML=
+name+
+(data.online[name]?" 🟢":" ⚫")+
+` <button onclick="showQR('${name}')">QR</button>`
 
-p.appendChild(div)
+reg.appendChild(div)
 
-}
+})
 
-const w=document.getElementById("winnerList")
 
-w.innerHTML=""
+// 設定表示
+
+settingView.innerHTML=
+
+`初期資金 ${data.settings.startMoney}
+信用初期 ${data.settings.startTrust}
+信用換金 ${data.settings.trustExchange}
+換金割合 ${data.settings.trustPercent}
+最低BET ${data.settings.minBet}`
+
+
+// 勝者ボタン
+
+winnerButtons.innerHTML=""
 
 for(let p in data.bets){
 
@@ -122,38 +271,82 @@ const btn=document.createElement("button")
 
 btn.textContent=p+" 勝者"
 
-btn.onclick=()=>{
+btn.onclick=()=>chooseWinner(p)
 
-fetch("/winner",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({name:p})
-})
+winnerButtons.appendChild(btn)
 
 }
 
-w.appendChild(btn)
+
+// 他ゲーム操作
+
+const other=document.getElementById("otherGame")
+
+other.innerHTML=""
+
+for(let p in data.bets){
+
+const bet=data.bets[p]
+
+if(bet<=0) continue
+
+const div=document.createElement("div")
+
+div.innerHTML=`
+
+${p} BET ${bet}
+
+<button onclick="betAction('${p}','confiscate')">没収</button>
+
+<button onclick="betAction('${p}','return')">返却</button>
+
+<button onclick="betAction('${p}','double')">2倍</button>
+
+<button onclick="betAction('${p}','triple')">3倍</button>
+
+`
+
+other.appendChild(div)
 
 }
 
-const h=document.getElementById("history")
 
-h.innerHTML=""
+// ターン履歴
+
+const hist=document.getElementById("turnHistory")
+
+hist.innerHTML=""
 
 data.turnHistory.slice().reverse().forEach(t=>{
 
 const div=document.createElement("div")
 
 div.textContent=
-"R"+t.round+" "+t.winner+" +"+t.pot
 
-h.appendChild(div)
+`R${t.round} ${t.winner} POT ${t.pot} x${t.multiplier} = ${t.win}`
+
+hist.appendChild(div)
 
 })
 
 })
 
 }
+
+
+function showQR(name){
+
+const url = location.origin+"/?player="+name
+
+const qr =
+`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
+
+const w = window.open("")
+
+w.document.write(`<img src="${qr}">`)
+
+}
+
 
 setInterval(loadState,1000)
 
