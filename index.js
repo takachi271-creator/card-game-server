@@ -1,22 +1,24 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
+const express = require("express")
+const http = require("http")
+const { Server } = require("socket.io")
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const app = express()
+const server = http.createServer(app)
+const io = new Server(server)
 
-app.use(express.json());
-app.use(express.static("public"));
+app.use(express.json())
+app.use(express.static("public"))
 
-let sockets = {};
+let sockets = {}
 
 let game = {
 
 players:{},
 bets:{},
-betHistory:{},
+betHistory:[],
 turnHistory:[],
+
+folded:{},
 
 loans:{},
 loanRequests:{},
@@ -29,120 +31,49 @@ eliminated:{},
 allowedPlayers:[],
 online:{},
 
+settings:{
 startMoney:100,
-trustStart:80,
-trustCost:30,
+startTrust:80,
+trustExchange:30,
 trustPercent:0.3,
-minBet:5,
+minBet:5
+},
 
-round:1,
-betEnabled:true
+betEnabled:true,
+round:1
 
-};
-
-
-/* ソケット */
+}
 
 io.on("connection",(socket)=>{
 
 socket.on("register",(name)=>{
-
-sockets[name]=socket;
-game.online[name]=true;
+sockets[name]=socket
+game.online[name]=true
+})
 
 socket.on("disconnect",()=>{
-game.online[name]=false;
-});
-
-});
-
-});
-
-
-/* 借金成功率 */
-
-function loanChance(trust){
-
-if(trust>=100) return 100
-if(trust>=80) return 80
-if(trust>=70) return 70
-if(trust>=50) return 50
-if(trust>=30) return 30
-if(trust>=10) return 10
-if(trust>=1) return 5
-
-return 0
-
+for(let p in sockets){
+if(sockets[p]===socket){
+game.online[p]=false
 }
-
-
-/* 倍率 */
-
-function calcMultiplier(amount,startMoney){
-
-const percent=(amount/startMoney)*100
-
-if(percent>=500) return 5
-if(percent>=200) return 3
-if(percent>=150) return 2
-if(percent>=100) return 1.9
-if(percent>=75) return 1.8
-if(percent>=50) return 1.5
-if(percent>=20) return 1.4
-
-return 1.2
-
 }
-
-
-/* プレイヤー追加 */
-
-app.post("/player/add",(req,res)=>{
-
-const {name}=req.body
-
-if(!game.allowedPlayers.includes(name))
-game.allowedPlayers.push(name)
-
-res.json(game)
-
 })
 
-
-/* プレイヤーリセット */
-
-app.post("/player/reset",(req,res)=>{
-
-const {name}=req.body
-
-delete game.players[name]
-delete game.bets[name]
-delete game.trust[name]
-delete game.loans[name]
-delete game.betHistory[name]
-delete game.eliminated[name]
-
-res.json(game)
-
 })
-
-
-/* 参加 */
 
 app.post("/join",(req,res)=>{
 
 const {name}=req.body
 
 if(!game.allowedPlayers.includes(name))
-return res.status(400).json({error:"未登録プレイヤー"})
+return res.send("登録されていない名前")
 
 if(!game.players[name]){
 
-game.players[name]=game.startMoney
-game.trust[name]=game.trustStart
-game.betHistory[name]=[]
-game.loanUsed[name]=false
+game.players[name]=game.settings.startMoney
+game.trust[name]=game.settings.startTrust
 game.eliminated[name]=false
+game.loanUsed[name]=false
 
 }
 
@@ -150,83 +81,94 @@ res.json(game)
 
 })
 
-
-/* BET */
-
 app.post("/bet",(req,res)=>{
 
 const {name,amount}=req.body
 
-if(game.eliminated[name])
-return res.send("破産しています")
-
 if(!game.betEnabled)
 return res.send("BET停止中")
 
-if(amount<game.minBet && amount!==0)
-return res.send("最低BET未満")
+if(game.eliminated[name])
+return res.send("破産")
 
-if(amount>game.players[name])
-return res.send("所持金不足")
+const current = game.bets[name] || 0
 
-const currentBet=game.bets[name]||0
-
-if(amount<currentBet)
+if(amount<current)
 return res.send("BETは減らせません")
+
+const max = game.players[name] + (game.loans[name]?.amount || 0)
+
+if(amount>max)
+return res.send("賭けすぎ")
 
 game.bets[name]=amount
 
-res.json(game)
-
+game.betHistory.push({
+player:name,
+bet:amount,
+round:game.round
 })
-
-
-/* BET受付切替 */
-
-app.post("/bet/toggle",(req,res)=>{
-
-game.betEnabled=!game.betEnabled
 
 res.json(game)
 
 })
 
+app.post("/fold",(req,res)=>{
 
-/* 借金 */
+const {name}=req.body
+
+game.folded[name]=true
+
+res.json(game)
+
+})
 
 app.post("/loan/request",(req,res)=>{
 
 const {name,amount}=req.body
 
 if(game.loanUsed[name])
-return res.send("このラウンドで借金済み")
+return res.send("このラウンド借金済み")
 
-const chance=loanChance(game.trust[name])
+if(game.loans[name])
+return res.send("借金中")
 
-if(Math.random()*100>=chance)
-return res.send("借金失敗")
-
-const lenders=
+let lenders =
 Object.keys(game.players)
 .filter(p=>p!==name && game.players[p]>=amount)
 
 if(lenders.length===0)
 return res.send("貸せる人なし")
 
-const lender=
+const lender =
 lenders[Math.floor(Math.random()*lenders.length)]
-
-game.loanUsed[name]=true
 
 game.loanRequests[lender]={borrower:name,amount}
 
-if(sockets[lender])
+let trust=game.trust[name]||0
+let chance=0
+
+if(trust>=100) chance=100
+else if(trust>=80) chance=80
+else if(trust>=70) chance=70
+else if(trust>=50) chance=50
+else if(trust>=30) chance=30
+else if(trust>=10) chance=10
+else if(trust>=1) chance=5
+
+if(Math.random()*100>chance){
+return res.send("借金通知失敗")
+}
+
+if(sockets[lender]){
 sockets[lender].emit("loanRequest",{borrower:name,amount})
+}
+
+game.loanUsed[name]=true
 
 res.json({lender})
 
 })
-
 
 app.post("/loan/accept",(req,res)=>{
 
@@ -238,20 +180,22 @@ if(!reqLoan) return res.send("申請なし")
 
 const {borrower,amount}=reqLoan
 
+if(game.players[name]<amount)
+return res.send("貸す金不足")
+
 game.players[name]-=amount
 game.players[borrower]+=amount
 
-game.loans[borrower]={lender:name,amount}
-
-delete game.loanRequests[name]
+game.loans[borrower]={lender:name,amount,round:game.round}
 
 game.trust[name]+=10
 game.trust[borrower]-=5
 
+delete game.loanRequests[name]
+
 res.json(game)
 
 })
-
 
 app.post("/loan/repay",(req,res)=>{
 
@@ -261,11 +205,14 @@ const loan=game.loans[name]
 
 if(!loan) return res.send("借金なし")
 
-if(game.players[name]<loan.amount)
-return res.send("所持金不足")
+const interest=Math.ceil(loan.amount*0.1)
+const total=loan.amount+interest
 
-game.players[name]-=loan.amount
-game.players[loan.lender]+=loan.amount
+if(game.players[name]<total)
+return res.send("返済不可")
+
+game.players[name]-=total
+game.players[loan.lender]+=total
 
 delete game.loans[name]
 
@@ -275,34 +222,32 @@ res.json(game)
 
 })
 
-
-/* 信用換金 */
-
 app.post("/trust/exchange",(req,res)=>{
 
 const {name}=req.body
 
-if(game.trust[name]<game.trustCost)
+if(game.trust[name]<game.settings.trustExchange)
 return res.send("信用不足")
 
-const gain=Math.floor(game.startMoney*game.trustPercent)
+const gain =
+Math.floor(game.settings.startMoney*game.settings.trustPercent)
 
-game.trust[name]-=game.trustCost
+game.trust[name]-=game.settings.trustExchange
 game.players[name]+=gain
 
 res.json(game)
 
 })
 
-
-/* 勝者決定 */
-
 app.post("/winner",(req,res)=>{
 
 const {name}=req.body
 
+if(game.folded[name])
+return res.send("降りている")
+
 if(!game.bets[name])
-return res.send("BETしてない")
+return res.send("BETなし")
 
 let pot=0
 
@@ -313,105 +258,98 @@ game.players[p]-=game.bets[p]
 
 }
 
-/* 勝者BET */
-
-const winnerBet = game.bets[name]
-
-/* 倍率 */
-
-const multi = calcMultiplier(winnerBet,game.startMoney)
-
-/* 獲得額 */
-
-const reward = Math.floor(pot * multi)
-
-game.players[name]+=reward
-
+game.players[name]+=pot
 
 game.turnHistory.push({
 round:game.round,
 winner:name,
-amount:reward
+pot:pot
 })
 
+io.emit("turnEnd",{winner:name,amount:pot})
 
-/* 破産チェック */
+game.bets={}
+game.folded={}
+game.loanUsed={}
+
+game.round++
 
 for(let p in game.players){
 
-if(game.players[p] <= 0){
-game.eliminated[p] = true
-}
+if(game.players[p]<=0)
+game.eliminated[p]=true
 
 }
-
-
-/* 借金リセット */
-
-for(let p in game.loanUsed)
-game.loanUsed[p]=false
-
-
-io.emit("turnEnd",{
-winner:name,
-amount:reward,
-round:game.round
-})
-
-
-game.bets={}
-game.round++
 
 res.json(game)
 
 })
 
+app.post("/host/addPlayer",(req,res)=>{
 
-/* ゲーム設定 */
+const {name}=req.body
 
-app.post("/settings",(req,res)=>{
-
-const {startMoney,trustStart,trustCost,trustPercent,minBet}=req.body
-
-game.startMoney=Number(startMoney)
-game.trustStart=Number(trustStart)
-game.trustCost=Number(trustCost)
-game.trustPercent=Number(trustPercent)
-game.minBet=Number(minBet)
+if(!game.allowedPlayers.includes(name))
+game.allowedPlayers.push(name)
 
 res.json(game)
 
 })
 
-
-/* ゲームリセット */
-
-app.post("/reset",(req,res)=>{
+app.post("/host/reset",(req,res)=>{
 
 game.players={}
 game.bets={}
-game.betHistory={}
+game.betHistory=[]
 game.turnHistory=[]
+game.folded={}
 game.loans={}
 game.loanRequests={}
 game.trust={}
 game.loanUsed={}
-game.online={}
 game.eliminated={}
+game.online={}
 game.round=1
 
 res.json(game)
 
 })
 
+app.post("/bet/result",(req,res)=>{
+
+const {name,type}=req.body
+
+const bet = game.bets[name] || 0
+
+if(type==="confiscate"){
+game.bets[name]=0
+}
+
+if(type==="return"){
+game.players[name]+=bet
+game.bets[name]=0
+}
+
+if(type==="double"){
+game.players[name]+=bet*2
+game.bets[name]=0
+}
+
+if(type==="triple"){
+game.players[name]+=bet*3
+game.bets[name]=0
+}
+
+res.json(game)
+
+})
 
 app.get("/state",(req,res)=>{
 res.json(game)
 })
 
-
 const PORT = process.env.PORT || 3000
 
 server.listen(PORT,()=>{
-console.log("Server running on port "+PORT)
+console.log("Server running")
 })
