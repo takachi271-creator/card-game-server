@@ -238,242 +238,388 @@ z-index:1000;
 
 </div>
 
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>HOST</title>
+<script>
 
-<style>
+function loadState(){
 
-body{
-margin:0;
-background:#111;
-color:white;
-font-family:sans-serif;
+fetch("/state")
+.then(r=>r.json())
+.then(data=>{
+
+// ラウンド
+round.textContent=data.round;
+
+// BET受付
+betStatus.textContent=
+data.betEnabled ? "🟢 可能" : "🔴 停止";
+
+// 現在設定
+cfgMoney.textContent=data.startMoney;
+cfgTrust.textContent=data.startTrust;
+cfgBet.textContent=data.minBet;
+
+
+// =================
+// プレイヤー一覧
+// =================
+
+playerList.innerHTML="";
+
+for(let p in data.players){
+
+const online = data.online && data.online[p];
+
+const row=document.createElement("div");
+row.className="playerRow";
+
+row.innerHTML=
+
+"<span>"+
+p+
+" "+(online?"🟢":"⚫")+
+"</span>"+
+
+"<span>"+
+
+"<button class='smallBtn' onclick=\"showQR('"+p+"')\">QR</button>"+
+
+"<button class='smallBtn' onclick=\"removePlayer('"+p+"')\">削除</button>"+
+
+"</span>";
+
+playerList.appendChild(row);
+
 }
 
-.container{
-max-width:480px;
-margin:auto;
-padding:12px;
+
+// =================
+// 勝者選択
+// =================
+
+winnerList.innerHTML="";
+
+for(let p in data.bets){
+
+const row=document.createElement("div");
+row.className="playerRow";
+
+row.innerHTML=
+
+"<span>"+p+"</span>"+
+
+"<button class='smallBtn' onclick=\"setWinner('"+p+"')\">勝者</button>";
+
+winnerList.appendChild(row);
+
 }
 
-.card{
-background:#1c1c1c;
-padding:16px;
-border-radius:14px;
-margin-bottom:14px;
+
+// =================
+// 他ゲー操作
+// =================
+
+otherGameTools.innerHTML="";
+
+for(let p in data.players){
+
+const bet=data.bets[p]||0;
+
+const row=document.createElement("div");
+row.className="playerRow";
+
+row.innerHTML=
+
+"<span>"+p+" BET:"+bet+"</span>"+
+
+"<span>"+
+
+"<button class='smallBtn' onclick=\"confiscate('"+p+"')\">没収</button>"+
+
+"<button class='smallBtn' onclick=\"refund('"+p+"')\">返却</button>"+
+
+"<button class='smallBtn' onclick=\"doubleMoney('"+p+"')\">2倍</button>"+
+
+"<button class='smallBtn' onclick=\"tripleMoney('"+p+"')\">3倍</button>"+
+
+"</span>";
+
+otherGameTools.appendChild(row);
+
 }
 
-h3{
-margin-top:0;
-border-bottom:1px solid #333;
-padding-bottom:6px;
+
+// =================
+// BET履歴
+// =================
+
+betHistory.innerHTML="";
+
+(data.betHistory||[])
+.slice()
+.reverse()
+.forEach(e=>{
+
+const div=document.createElement("div");
+div.className="log";
+
+div.textContent=
+"R"+e.round+
+" "+e.name+
+" BET "+e.amount;
+
+betHistory.appendChild(div);
+
+});
+
+
+// =================
+// ターン履歴
+// =================
+
+turnHistory.innerHTML="";
+
+(data.turnHistory||[])
+.slice()
+.reverse()
+.forEach(e=>{
+
+const div=document.createElement("div");
+div.className="log";
+
+div.textContent=
+"R"+e.round+
+" "+e.winner+
+" +"+e.amount;
+
+turnHistory.appendChild(div);
+
+});
+
+});
+
 }
 
-button,input{
-width:100%;
-padding:12px;
-font-size:16px;
-border:none;
-border-radius:10px;
-margin-top:6px;
-box-sizing:border-box;
+
+// =================
+// BET受付切替
+// =================
+
+function toggleBet(){
+
+fetch("/bet/toggle",{method:"POST"})
+.then(loadState);
+
 }
 
-button{
-background:#2ecc71;
-color:white;
+
+// =================
+// プレイヤー追加
+// =================
+
+function addPlayer(){
+
+const name=newPlayer.value;
+
+fetch("/player/add",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-.smallBtn{
-width:auto;
-padding:6px 10px;
-font-size:14px;
-margin-left:4px;
+
+// =================
+// プレイヤー削除
+// =================
+
+function removePlayer(name){
+
+if(!confirm(name+" を削除しますか？")) return;
+
+fetch("/player/remove",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-.playerRow{
-display:flex;
-justify-content:space-between;
-align-items:center;
-padding:8px 0;
-border-bottom:1px solid #333;
+
+// =================
+// 勝者
+// =================
+
+function setWinner(name){
+
+if(!confirm(name+" を勝者にしますか？")) return;
+
+fetch("/winner",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-.online{
-color:#2ecc71;
+
+// =================
+// 設定保存
+// =================
+
+function saveSettings(){
+
+fetch("/settings",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+
+startMoney:Number(startMoney.value),
+
+startTrust:Number(startTrust.value),
+
+trustCost:Number(trustCost.value),
+
+exchangeRate:Number(exchangeRate.value),
+
+minBet:Number(minBet.value)
+
+})
+
+})
+.then(loadState);
+
 }
 
-.offline{
-color:#777;
+
+// =================
+// 他ゲー操作
+// =================
+
+function confiscate(name){
+
+fetch("/admin/confiscate",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-.log{
-font-size:14px;
-border-bottom:1px solid #333;
-padding:4px 0;
+function refund(name){
+
+fetch("/admin/refund",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-.qrPopup{
-position:fixed;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:#000;
-padding:20px;
-border-radius:12px;
-display:none;
-z-index:1000;
+function doubleMoney(name){
+
+fetch("/admin/double",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name})
+
+})
+.then(loadState);
+
 }
 
-</style>
+function tripleMoney(name){
 
-</head>
+fetch("/admin/triple",{
 
-<body>
+method:"POST",
 
-<div class="container">
+headers:{"Content-Type":"application/json"},
 
-<h2>HOST</h2>
+body:JSON.stringify({name})
 
-<!-- ゲーム状況 -->
+})
+.then(loadState);
 
-<div class="card">
+}
 
-<h3>ゲーム状況</h3>
 
-<p>ラウンド : <span id="round">1</span></p>
+// =================
+// リセット
+// =================
 
-<p>BET受付 :
-<span id="betStatus">可能</span>
-</p>
+function resetGame(){
 
-<button onclick="toggleBet()">BET受付切替</button>
+if(!confirm("ゲームをリセットしますか？")) return;
 
-</div>
+fetch("/reset",{method:"POST"})
+.then(loadState);
 
+}
 
-<!-- ゲーム設定 -->
 
-<div class="card">
+// =================
+// QR表示
+// =================
 
-<h3>ゲーム設定</h3>
+function showQR(name){
 
-初期資金
-<input id="startMoney" type="number">
+const url=
+location.origin+
+"/player.html?name="+name;
 
-信用初期
-<input id="startTrust" type="number">
+qrName.textContent=name;
 
-信用換金
-<input id="trustCost" type="number">
+qrImg.src=
+"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+
+encodeURIComponent(url);
 
-換金割合 %
-<input id="exchangeRate" type="number">
+qrPopup.style.display="block";
 
-最低BET
-<input id="minBet" type="number">
+}
 
-<button onclick="saveSettings()">設定保存</button>
+function closeQR(){
 
-<p style="margin-top:10px">
+qrPopup.style.display="none";
 
-現在設定<br>
+}
 
-資金 : <span id="cfgMoney"></span><br>
-信用 : <span id="cfgTrust"></span><br>
-最低BET : <span id="cfgBet"></span>
 
-</p>
+// =================
+// 自動更新
+// =================
 
-</div>
+setInterval(loadState,1000);
 
-
-<!-- プレイヤー管理 -->
-
-<div class="card">
-
-<h3>プレイヤー管理</h3>
-
-<input id="newPlayer" placeholder="名前">
-
-<button onclick="addPlayer()">プレイヤー追加</button>
-
-<div id="playerList"></div>
-
-</div>
-
-
-<!-- 勝者選択 -->
-
-<div class="card">
-
-<h3>勝者選択</h3>
-
-<div id="winnerList"></div>
-
-</div>
-
-
-<!-- 他ゲー用 -->
-
-<div class="card">
-
-<h3>他ゲー用操作</h3>
-
-<div id="otherGameTools"></div>
-
-</div>
-
-
-<!-- BET履歴 -->
-
-<div class="card">
-
-<h3>BET履歴</h3>
-
-<div id="betHistory"></div>
-
-</div>
-
-
-<!-- ターン履歴 -->
-
-<div class="card">
-
-<h3>ターン履歴</h3>
-
-<div id="turnHistory"></div>
-
-</div>
-
-
-<!-- 管理 -->
-
-<div class="card">
-
-<h3>管理</h3>
-
-<button onclick="resetGame()">ゲームリセット</button>
-
-</div>
-
-
-</div>
-
-
-<!-- QRポップアップ -->
-
-<div id="qrPopup" class="qrPopup">
-
-<h3 id="qrName"></h3>
-
-<img id="qrImg" width="220">
-
-<br><br>
-
-<button onclick="closeQR()">閉じる</button>
-
-</div>
+</script>
