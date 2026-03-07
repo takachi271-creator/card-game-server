@@ -305,3 +305,14 @@ game.eliminated[p]=true;
 res.json(game);
 
 });
+
+// 状態取得
+app.get("/state",(req,res)=>{
+  res.json(game);
+});
+
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
