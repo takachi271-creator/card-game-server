@@ -175,6 +175,7 @@ res.json(game)
 app.post("/loan/reject",(req,res)=>{
 
 const {name}=req.body
+
 delete game.loanRequests[name]
 
 res.json(game)
@@ -184,6 +185,7 @@ res.json(game)
 app.post("/loan/repay",(req,res)=>{
 
 const {name}=req.body
+
 const loan=game.loans[name]
 
 if(!loan) return res.send("借金なし")
@@ -231,16 +233,12 @@ return res.send("BETなし")
 let pot=0
 
 for(let p in game.bets){
-
 pot+=game.bets[p]
 game.players[p]-=game.bets[p]
-
 }
 
-// 勝者BET
 const winnerBet = game.bets[name]
 
-// BET割合
 const percent = (winnerBet / game.settings.startMoney) * 100
 
 let multiplier = 1.2
@@ -255,7 +253,7 @@ else if(percent >= 20) multiplier = 1.4
 
 const reward = Math.floor(pot * multiplier)
 
-game.players[name]+=reward
+game.players[name] += reward
 
 game.turnHistory.push({
 round:game.round,
@@ -263,6 +261,8 @@ winner:name,
 pot:pot,
 reward:reward
 })
+
+if(game.turnHistory.length>50) game.turnHistory.shift()
 
 io.emit("turnEnd",{
 winner:name,
@@ -275,25 +275,12 @@ game.folded={}
 game.round++
 
 for(let p in game.players){
-
-if(game.players[p]<=0){
-
-game.eliminated[p]=true
-
-}
-
+checkBankrupt(p)
 }
 
 res.json(game)
 
 })
-
-
-for(let p in game.players){
-checkBankrupt(p)
-}
-
-res.json(game)
 
 app.post("/bet/toggle",(req,res)=>{
 game.betEnabled=!game.betEnabled
@@ -339,10 +326,6 @@ app.get("/state",(req,res)=>{
 res.json(game)
 })
 
-
-
-/* 他ゲーム管理 */
-
 app.post("/admin/confiscate",(req,res)=>{
 const {name}=req.body
 if(game.players[name]!=null) game.players[name]=0
@@ -366,7 +349,6 @@ const {name}=req.body
 if(game.bets[name]) game.players[name]+=game.bets[name]*3
 res.json(game)
 })
-
 
 const PORT = process.env.PORT || 3000
 
