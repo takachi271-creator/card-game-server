@@ -100,9 +100,15 @@ z-index:999;
 
 <p>⭐ 信用: <span id="trust">0</span></p>
 
-<p id="gameOver" style="color:red;font-weight:bold;display:none;">
+<div id="gameOver" style="display:none; text-align:center;">
+
+<p style="color:red;font-weight:bold;font-size:22px;">
 破産しました
 </p>
+
+<button onclick="spectate()">ベットしないで参加</button>
+
+</div>
 
 </div>
 
@@ -129,8 +135,6 @@ z-index:999;
 <p style="text-align:center;">現在</p>
 
 <p id="trustValue" style="font-size:30px;text-align:center;">0</p>
-
-<p style="text-align:center;">通知成功率 <span id="trustChance">0%</span></p>
 
 <button onclick="exchangeTrust()">信用換金</button>
 
@@ -378,7 +382,14 @@ round.textContent=data.round
 
 minBet.textContent=data.settings.minBet
 
+if(data.eliminated[currentName]){
 
+gameOver.style.display="block"
+
+betAmount.value = 0
+betAmount.disabled = true
+
+}
 
 let pot=0
 
@@ -485,6 +496,7 @@ playerList.appendChild(div)
 }
 
 setInterval(loadState,1000)
+
 
 </script>
 
