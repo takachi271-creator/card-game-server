@@ -312,8 +312,6 @@ checkBankrupt(p)
 
 res.json(game)
 
-})
-
 app.post("/bet/toggle",(req,res)=>{
 game.betEnabled=!game.betEnabled
 res.json(game)
