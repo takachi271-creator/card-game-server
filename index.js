@@ -175,7 +175,6 @@ res.json(game)
 app.post("/loan/reject",(req,res)=>{
 
 const {name}=req.body
-
 delete game.loanRequests[name]
 
 res.json(game)
@@ -185,7 +184,6 @@ res.json(game)
 app.post("/loan/repay",(req,res)=>{
 
 const {name}=req.body
-
 const loan=game.loans[name]
 
 if(!loan) return res.send("借金なし")
@@ -243,7 +241,8 @@ const percent = (winnerBet / game.settings.startMoney) * 100
 
 let multiplier = 1.2
 
-if(percent >= 500) multiplier = 5
+if(winnerBet===0) multiplier=0
+else if(percent >= 500) multiplier = 5
 else if(percent >= 200) multiplier = 3
 else if(percent >= 150) multiplier = 2
 else if(percent >= 100) multiplier = 1.9
@@ -327,9 +326,18 @@ res.json(game)
 })
 
 app.post("/admin/confiscate",(req,res)=>{
+
 const {name}=req.body
-if(game.players[name]!=null) game.players[name]=0
+
+const bet = game.bets[name] || 0
+
+if(bet>0){
+game.players[name]-=bet
+game.bets[name]=0
+}
+
 res.json(game)
+
 })
 
 app.post("/admin/refund",(req,res)=>{
