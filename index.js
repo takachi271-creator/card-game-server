@@ -224,8 +224,9 @@ app.post("/winner",(req,res)=>{
 
 const {name}=req.body
 
-if(!game.bets[name])
+if(!game.bets[name]){
 return res.send("BETなし")
+}
 
 let pot=0
 
@@ -235,6 +236,58 @@ pot+=game.bets[p]
 game.players[p]-=game.bets[p]
 
 }
+
+// 勝者BET
+const winnerBet = game.bets[name]
+
+// BET割合
+const percent = (winnerBet / game.settings.startMoney) * 100
+
+let multiplier = 1.2
+
+if(percent >= 500) multiplier = 5
+else if(percent >= 200) multiplier = 3
+else if(percent >= 150) multiplier = 2
+else if(percent >= 100) multiplier = 1.9
+else if(percent >= 75) multiplier = 1.8
+else if(percent >= 50) multiplier = 1.5
+else if(percent >= 20) multiplier = 1.4
+
+const reward = Math.floor(pot * multiplier)
+
+game.players[name]+=reward
+
+game.turnHistory.push({
+round:game.round,
+winner:name,
+pot:pot,
+reward:reward
+})
+
+io.emit("turnEnd",{
+winner:name,
+amount:reward
+})
+
+game.bets={}
+game.folded={}
+
+game.round++
+
+for(let p in game.players){
+
+if(game.players[p]<=0){
+
+game.eliminated[p]=true
+
+}
+
+}
+
+res.json(game)
+
+})
+
 
 game.players[name]+=pot
 
