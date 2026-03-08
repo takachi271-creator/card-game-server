@@ -7,59 +7,43 @@
 <style>
 
 body{
-margin:0;
 background:#111;
 color:white;
 font-family:sans-serif;
+margin:0;
 }
 
 .container{
-max-width:480px;
+max-width:900px;
 margin:auto;
-padding:12px;
+padding:20px;
 }
 
 .card{
 background:#1c1c1c;
-padding:16px;
-border-radius:14px;
-margin-bottom:14px;
-}
-
-h3{
-margin-top:0;
-border-bottom:1px solid #333;
-padding-bottom:6px;
+padding:15px;
+margin-bottom:15px;
+border-radius:10px;
 }
 
 button,input{
-width:100%;
-padding:12px;
+padding:10px;
+margin-top:5px;
 font-size:16px;
-border:none;
-border-radius:10px;
-margin-top:6px;
-box-sizing:border-box;
 }
 
 button{
 background:#2ecc71;
 color:white;
+border:none;
+border-radius:6px;
 }
 
-.smallBtn{
-width:auto;
-padding:6px 10px;
-font-size:14px;
-margin-left:4px;
-}
-
-.playerRow{
+.row{
 display:flex;
 justify-content:space-between;
 align-items:center;
-padding:8px 0;
-border-bottom:1px solid #333;
+margin:5px 0;
 }
 
 .online{
@@ -70,24 +54,6 @@ color:#2ecc71;
 color:#777;
 }
 
-.log{
-font-size:14px;
-border-bottom:1px solid #333;
-padding:4px 0;
-}
-
-.qrPopup{
-position:fixed;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:#000;
-padding:20px;
-border-radius:12px;
-display:none;
-z-index:1000;
-}
-
 </style>
 
 </head>
@@ -96,7 +62,6 @@ z-index:1000;
 
 <div class="container">
 
-<h2>HOST</h2>
 
 <!-- ゲーム状況 -->
 
@@ -106,13 +71,12 @@ z-index:1000;
 
 <p>ラウンド : <span id="round">1</span></p>
 
-<p>BET受付 :
-<span id="betStatus">可能</span>
-</p>
+<p>BET受付 : <span id="betStatus">ON</span></p>
 
 <button onclick="toggleBet()">BET受付切替</button>
 
 </div>
+
 
 
 <!-- ゲーム設定 -->
@@ -121,34 +85,29 @@ z-index:1000;
 
 <h3>ゲーム設定</h3>
 
-初期資金
+<p>初期資金</p>
 <input id="startMoney" type="number">
 
-信用初期
+<p>信用初期</p>
 <input id="startTrust" type="number">
 
-信用換金
+<p>信用換金</p>
 <input id="trustCost" type="number">
 
-換金割合 %
+<p>換金割合 (%)</p>
 <input id="exchangeRate" type="number">
 
-最低BET
+<p>最低BET</p>
 <input id="minBet" type="number">
 
 <button onclick="saveSettings()">設定保存</button>
 
-<p style="margin-top:10px">
+<h4>現在設定</h4>
 
-現在設定<br>
-
-資金 : <span id="cfgMoney"></span><br>
-信用 : <span id="cfgTrust"></span><br>
-最低BET : <span id="cfgBet"></span>
-
-</p>
+<div id="currentSettings"></div>
 
 </div>
+
 
 
 <!-- プレイヤー管理 -->
@@ -166,6 +125,7 @@ z-index:1000;
 </div>
 
 
+
 <!-- 勝者選択 -->
 
 <div class="card">
@@ -176,16 +136,6 @@ z-index:1000;
 
 </div>
 
-
-<!-- 他ゲー用 -->
-
-<div class="card">
-
-<h3>他ゲー用操作</h3>
-
-<div id="otherGameTools"></div>
-
-</div>
 
 
 <!-- BET履歴 -->
@@ -199,6 +149,7 @@ z-index:1000;
 </div>
 
 
+
 <!-- ターン履歴 -->
 
 <div class="card">
@@ -208,6 +159,7 @@ z-index:1000;
 <div id="turnHistory"></div>
 
 </div>
+
 
 
 <!-- 管理 -->
@@ -224,21 +176,10 @@ z-index:1000;
 </div>
 
 
-<!-- QRポップアップ -->
-
-<div id="qrPopup" class="qrPopup">
-
-<h3 id="qrName"></h3>
-
-<img id="qrImg" width="220">
-
-<br><br>
-
-<button onclick="closeQR()">閉じる</button>
-
-</div>
 
 <script>
+
+
 
 function loadState(){
 
@@ -246,241 +187,127 @@ fetch("/state")
 .then(r=>r.json())
 .then(data=>{
 
-// ラウンド
-round.textContent=data.round;
 
-// BET受付
-betStatus.textContent=
-data.betEnabled ? "🟢 可能" : "🔴 停止";
-
-// 現在設定
-cfgMoney.textContent=data.startMoney;
-cfgTrust.textContent=data.startTrust;
-cfgBet.textContent=data.minBet;
+round.textContent=data.round
 
 
-// =================
-// プレイヤー一覧
-// =================
+betStatus.textContent=data.betEnabled ? "ON" : "OFF"
 
-playerList.innerHTML="";
+
+
+startMoney.value=data.settings.startMoney
+startTrust.value=data.settings.startTrust
+trustCost.value=data.settings.trustCost
+exchangeRate.value=data.settings.exchangeRate
+minBet.value=data.settings.minBet
+
+
+
+currentSettings.innerHTML=
+`
+初期資金 ${data.settings.startMoney}<br>
+信用初期 ${data.settings.startTrust}<br>
+信用換金 ${data.settings.trustCost}<br>
+換金割合 ${data.settings.exchangeRate}%<br>
+最低BET ${data.settings.minBet}
+`
+
+
+
+playerList.innerHTML=""
+
+
 
 for(let p in data.players){
 
-const online = data.online && data.online[p];
+const div=document.createElement("div")
 
-const row=document.createElement("div");
-row.className="playerRow";
+const online=data.online[p]?"🟢":"⚫"
 
-row.innerHTML=
+div.innerHTML=
+`
+<div class="row">
+${p} ${online}
+<button onclick="showQR('${p}')">QR</button>
+<button onclick="removePlayer('${p}')">削除</button>
+</div>
+`
 
-"<span>"+
-p+
-" "+(online?"🟢":"⚫")+
-"</span>"+
-
-"<span>"+
-
-"<button class='smallBtn' onclick=\"showQR('"+p+"')\">QR</button>"+
-
-"<button class='smallBtn' onclick=\"removePlayer('"+p+"')\">削除</button>"+
-
-"</span>";
-
-playerList.appendChild(row);
+playerList.appendChild(div)
 
 }
 
 
-// =================
-// 勝者選択
-// =================
 
-winnerList.innerHTML="";
+winnerList.innerHTML=""
+
+
 
 for(let p in data.bets){
 
-const row=document.createElement("div");
-row.className="playerRow";
+const div=document.createElement("div")
 
-row.innerHTML=
+div.innerHTML=
+`
+${p} BET ${data.bets[p]}
+<button onclick="setWinner('${p}')">勝者</button>
+`
 
-"<span>"+p+"</span>"+
-
-"<button class='smallBtn' onclick=\"setWinner('"+p+"')\">勝者</button>";
-
-winnerList.appendChild(row);
-
-}
-
-
-// =================
-// 他ゲー操作
-// =================
-
-otherGameTools.innerHTML="";
-
-for(let p in data.players){
-
-const bet=data.bets[p]||0;
-
-const row=document.createElement("div");
-row.className="playerRow";
-
-row.innerHTML=
-
-"<span>"+p+" BET:"+bet+"</span>"+
-
-"<span>"+
-
-"<button class='smallBtn' onclick=\"confiscate('"+p+"')\">没収</button>"+
-
-"<button class='smallBtn' onclick=\"refund('"+p+"')\">返却</button>"+
-
-"<button class='smallBtn' onclick=\"doubleMoney('"+p+"')\">2倍</button>"+
-
-"<button class='smallBtn' onclick=\"tripleMoney('"+p+"')\">3倍</button>"+
-
-"</span>";
-
-otherGameTools.appendChild(row);
+winnerList.appendChild(div)
 
 }
 
 
-// =================
-// BET履歴
-// =================
 
-betHistory.innerHTML="";
+betHistory.innerHTML=""
 
-(data.betHistory||[])
+
+data.betHistory
 .slice()
 .reverse()
-.forEach(e=>{
+.forEach(h=>{
 
-const div=document.createElement("div");
-div.className="log";
+const div=document.createElement("div")
 
-div.textContent=
-"R"+e.round+
-" "+e.name+
-" BET "+e.amount;
+div.textContent=`R${h.round} ${h.name} BET ${h.amount}`
 
-betHistory.appendChild(div);
+betHistory.appendChild(div)
 
-});
+})
 
 
-// =================
-// ターン履歴
-// =================
 
-turnHistory.innerHTML="";
+turnHistory.innerHTML=""
 
-(data.turnHistory||[])
+
+data.turnHistory
 .slice()
 .reverse()
-.forEach(e=>{
+.forEach(h=>{
 
-const div=document.createElement("div");
-div.className="log";
+const div=document.createElement("div")
 
-div.textContent=
-"R"+e.round+
-" "+e.winner+
-" +"+e.amount;
+div.textContent=`R${h.round} ${h.winner} +${h.amount}`
 
-turnHistory.appendChild(div);
+turnHistory.appendChild(div)
 
-});
+})
 
-});
+
+})
 
 }
 
 
-// =================
-// BET受付切替
-// =================
 
 function toggleBet(){
 
 fetch("/bet/toggle",{method:"POST"})
-.then(loadState);
+.then(loadState)
 
 }
 
 
-// =================
-// プレイヤー追加
-// =================
-
-function addPlayer(){
-
-const name=newPlayer.value;
-
-fetch("/player/add",{
-
-method:"POST",
-
-headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify({name})
-
-})
-.then(loadState);
-
-}
-
-
-// =================
-// プレイヤー削除
-// =================
-
-function removePlayer(name){
-
-if(!confirm(name+" を削除しますか？")) return;
-
-fetch("/player/remove",{
-
-method:"POST",
-
-headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify({name})
-
-})
-.then(loadState);
-
-}
-
-
-// =================
-// 勝者
-// =================
-
-function setWinner(name){
-
-if(!confirm(name+" を勝者にしますか？")) return;
-
-fetch("/winner",{
-
-method:"POST",
-
-headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify({name})
-
-})
-.then(loadState);
-
-}
-
-
-// =================
-// 設定保存
-// =================
 
 function saveSettings(){
 
@@ -488,138 +315,122 @@ fetch("/settings",{
 
 method:"POST",
 
-headers:{"Content-Type":"application/json"},
+headers:{
+"Content-Type":"application/json"
+},
 
 body:JSON.stringify({
 
-startMoney:Number(startMoney.value),
+startMoney:parseInt(startMoney.value),
 
-startTrust:Number(startTrust.value),
+startTrust:parseInt(startTrust.value),
 
-trustCost:Number(trustCost.value),
+trustCost:parseInt(trustCost.value),
 
-exchangeRate:Number(exchangeRate.value),
+exchangeRate:parseInt(exchangeRate.value),
 
-minBet:Number(minBet.value)
-
-})
+minBet:parseInt(minBet.value)
 
 })
-.then(loadState);
+
+}).then(loadState)
 
 }
 
 
-// =================
-// 他ゲー操作
-// =================
 
-function confiscate(name){
+function addPlayer(){
 
-fetch("/admin/confiscate",{
+fetch("/player/add",{
 
 method:"POST",
 
-headers:{"Content-Type":"application/json"},
+headers:{
+"Content-Type":"application/json"
+},
 
-body:JSON.stringify({name})
+body:JSON.stringify({
+
+name:newPlayer.value
 
 })
-.then(loadState);
+
+}).then(loadState)
 
 }
 
-function refund(name){
 
-fetch("/admin/refund",{
+
+function removePlayer(name){
+
+fetch("/player/remove",{
 
 method:"POST",
 
-headers:{"Content-Type":"application/json"},
+headers:{
+"Content-Type":"application/json"
+},
 
-body:JSON.stringify({name})
+body:JSON.stringify({
+
+name:name
 
 })
-.then(loadState);
+
+}).then(loadState)
 
 }
 
-function doubleMoney(name){
 
-fetch("/admin/double",{
+
+function setWinner(name){
+
+fetch("/winner",{
 
 method:"POST",
 
-headers:{"Content-Type":"application/json"},
+headers:{
+"Content-Type":"application/json"
+},
 
-body:JSON.stringify({name})
+body:JSON.stringify({
 
-})
-.then(loadState);
-
-}
-
-function tripleMoney(name){
-
-fetch("/admin/triple",{
-
-method:"POST",
-
-headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify({name})
+name:name
 
 })
-.then(loadState);
+
+}).then(loadState)
 
 }
 
 
-// =================
-// リセット
-// =================
 
 function resetGame(){
 
-if(!confirm("ゲームをリセットしますか？")) return;
-
 fetch("/reset",{method:"POST"})
-.then(loadState);
+.then(loadState)
 
 }
 
 
-// =================
-// QR表示
-// =================
 
 function showQR(name){
 
-const url=
-location.origin+
-"/player.html?name="+name;
+const url=location.origin+"/player.html?name="+name
 
-qrName.textContent=name;
-
-qrImg.src=
-"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+
-encodeURIComponent(url);
-
-qrPopup.style.display="block";
-
-}
-
-function closeQR(){
-
-qrPopup.style.display="none";
+prompt("QR用URL",url)
 
 }
 
 
-// =================
-// 自動更新
-// =================
 
-setInterval(loadState,1000);
+setInterval(loadState,2000)
+
+loadState()
+
 
 </script>
+
+
+</body>
+</html>

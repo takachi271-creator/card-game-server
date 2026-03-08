@@ -76,8 +76,6 @@ z-index:999;
 
 <div class="container">
 
-<!-- ロビー -->
-
 <div id="lobby">
 
 <h2>参加</h2>
@@ -89,11 +87,10 @@ z-index:999;
 </div>
 
 
-<!-- ゲーム画面 -->
-
 <div id="game" style="display:none;">
 
 <div id="playerNameTitle"></div>
+
 
 <div class="card">
 
@@ -101,10 +98,10 @@ z-index:999;
 
 <p>💳 借金: <span id="debt">なし</span></p>
 
-<p>⭐ 信用: <span id="trustValue">0</span></p>
+<p>⭐ 信用: <span id="trust">0</span></p>
 
 <p id="gameOver" style="color:red;font-weight:bold;display:none;">
-GAME OVER
+破産しました
 </p>
 
 </div>
@@ -131,19 +128,11 @@ GAME OVER
 
 <p style="text-align:center;">現在</p>
 
-<p id="trustValueBig"
-style="font-size:30px;font-weight:bold;text-align:center;">
-0
-</p>
+<p id="trustValue" style="font-size:30px;text-align:center;">0</p>
 
-<p style="text-align:center;">
-通知成功率 :
-<span id="trustChance">0%</span>
-</p>
+<p style="text-align:center;">通知成功率 <span id="trustChance">0%</span></p>
 
-<button onclick="exchangeTrust()">
-信用換金
-</button>
+<button onclick="exchangeTrust()">信用換金</button>
 
 </div>
 
@@ -154,13 +143,13 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 <input id="betAmount" type="number" placeholder="BET">
 
-<p>現在倍率 : <span id="multiplier">1x</span></p>
+<p>現在倍率 <span id="multiplier">1x</span></p>
 
-<p>現在BET : <span id="myBet">0</span></p>
-
-<p>勝利時 : <span id="winAmount">0</span></p>
+<p>勝利時 +<span id="winAmount">0</span></p>
 
 <button onclick="bet()">ベット</button>
+
+<button onclick="fold()">降りる</button>
 
 </div>
 
@@ -186,106 +175,135 @@ style="font-size:30px;font-weight:bold;text-align:center;">
 
 </div>
 
-</div>
-
-
-<!-- 破産画面 -->
-
-<div id="bankrupt" style="display:none">
-
-<h2 id="bankruptName"></h2>
-
-<h3 style="color:red">
-破産しました
-</h3>
-
-<button onclick="spectate()">
-ベットしないで参加
-</button>
-
-<div class="card">
-
-<h3>現在参加者</h3>
-
-<div id="bankruptPlayers"></div>
 
 </div>
-
 </div>
 
-</div>
 
 <script>
 
-const socket = io();
+const socket = io()
 
-let currentName="";
+let currentName=""
+
+
+function calcMultiplier(amount,startMoney){
+
+const percent=(amount/startMoney)*100
+
+if(percent>=500) return 5
+if(percent>=200) return 3
+if(percent>=150) return 2
+if(percent>=100) return 1.9
+if(percent>=75) return 1.8
+if(percent>=50) return 1.5
+if(percent>=20) return 1.4
+
+return 1.2
+
+}
+
 
 
 function joinGame(){
 
-const name=playerName.value;
+const name=playerName.value
 
 fetch("/join",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name})
+
 })
+
 .then(()=>{
 
-currentName=name;
+currentName=name
 
-socket.emit("register",currentName);
+socket.emit("register",currentName)
 
-lobby.style.display="none";
-game.style.display="block";
+lobby.style.display="none"
+game.style.display="block"
 
-playerNameTitle.textContent=currentName;
+playerNameTitle.textContent=currentName
 
-loadState();
+loadState()
 
-});
+})
 
 }
+
 
 
 function bet(){
 
-const amount=parseInt(betAmount.value)||0;
+const amount=parseInt(betAmount.value)||0
 
 fetch("/bet",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name:currentName,amount})
-})
-.then(loadState);
+
+}).then(loadState)
 
 }
+
+
+
+function fold(){
+
+fetch("/fold",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name:currentName})
+
+}).then(loadState)
+
+}
+
 
 
 function requestLoan(){
 
-const amount=parseInt(loanAmount.value);
+const amount=parseInt(loanAmount.value)
 
 fetch("/loan/request",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name:currentName,amount})
-});
+
+})
 
 }
+
 
 
 function exchangeTrust(){
 
 fetch("/trust/exchange",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name:currentName})
-})
-.then(loadState);
+
+}).then(loadState)
 
 }
+
 
 
 socket.on("loanRequest",(data)=>{
@@ -293,167 +311,180 @@ socket.on("loanRequest",(data)=>{
 if(confirm(`${data.borrower} が ${data.amount} 借りたい\n貸しますか？`)){
 
 fetch("/loan/accept",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name:currentName})
-});
+
+})
 
 }else{
 
 fetch("/loan/reject",{
+
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify({name:currentName})
-});
+
+})
 
 }
 
-});
+})
+
 
 
 socket.on("turnEnd",(data)=>{
 
-const popup=document.getElementById("winnerPopup");
-
-popup.innerHTML=
+winnerPopup.innerHTML=
 "🏆 勝者<br><br>"+
 data.winner+
 "<br><br>+"+
-data.amount;
+data.amount
 
-popup.style.display="block";
+winnerPopup.style.display="block"
 
 setTimeout(()=>{
-popup.style.display="none";
-},2000);
+winnerPopup.style.display="none"
+},2000)
 
-loadState();
+loadState()
 
-});
+})
+
 
 
 function loadState(){
 
 fetch("/state")
+
 .then(r=>r.json())
+
 .then(data=>{
+
+money.textContent=Math.floor(data.players[currentName]||0)
+
+const loan=data.loans[currentName]
+
+debt.textContent=loan?loan.amount:"なし"
+
+trust.textContent=data.trust[currentName]||0
+
+round.textContent=data.round
+
+minBet.textContent=data.settings.minBet
+
+
+
+let pot=0
+
+for(let p in data.bets){
+
+pot+=data.bets[p]
+
+}
+
+pot ? pot : 0
+
+document.getElementById("pot").textContent=pot
+
+
+
+const myBet=data.bets[currentName]||0
+
+const multiplier=calcMultiplier(myBet,data.settings.startMoney)
+
+const win=Math.floor(myBet*multiplier)-myBet
+
+document.getElementById("multiplier").textContent=multiplier+"x"
+
+document.getElementById("winAmount").textContent=win
+
 
 
 if(data.eliminated[currentName]){
 
-showBankrupt(data);
-return;
+gameOver.style.display="block"
 
 }
 
 
-money.textContent=Math.floor(data.players[currentName]);
 
-const loan=data.loans[currentName];
+const trustPoint=data.trust[currentName]||0
 
-debt.textContent=loan?loan.amount:"なし";
-
-
-trustValue.textContent=data.trust[currentName]||0;
-
-trustValueBig.textContent=data.trust[currentName]||0;
+trustValue.textContent=trustPoint
 
 
-round.textContent=data.round;
 
-minBet.textContent=data.minBet||0;
+let chance=0
+
+if(trustPoint>=100) chance=100
+else if(trustPoint>=80) chance=80
+else if(trustPoint>=70) chance=70
+else if(trustPoint>=50) chance=50
+else if(trustPoint>=30) chance=30
+else if(trustPoint>=10) chance=10
+else if(trustPoint>=1) chance=5
+
+trustChance.textContent=chance+"%"
+
+loanChance.textContent=chance+"%"
 
 
-let pot=0;
 
-for(let p in data.bets){
-pot+=data.bets[p];
+repayArea.innerHTML=""
+
+if(loan){
+
+const btn=document.createElement("button")
+
+btn.textContent="全額返済"
+
+btn.onclick=()=>{
+
+fetch("/loan/repay",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({name:currentName})
+
+}).then(loadState)
+
 }
 
-document.getElementById("pot").textContent=pot;
+repayArea.appendChild(btn)
+
+}
 
 
-const myBet=data.bets[currentName]||0;
 
-document.getElementById("myBet").textContent=myBet;
-
-
-const multiplier = myBet>0 ? (pot/myBet).toFixed(2) : 1;
-
-document.getElementById("multiplier").textContent=multiplier+"x";
-
-
-document.getElementById("winAmount").textContent=Math.floor(pot*multiplier);
-
-
-// プレイヤー一覧
-
-playerList.innerHTML="";
+playerList.innerHTML=""
 
 for(let p in data.players){
 
-const div=document.createElement("div");
+const div=document.createElement("div")
 
-div.className=data.bets[p]?"betActive":"";
+div.className=data.bets[p]?"betActive":""
 
 div.textContent=
 `${p} : ${Math.floor(data.players[p])}`
-+(data.bets[p]?` (BET ${data.bets[p]})`:"");
++(data.bets[p]?` (BET ${data.bets[p]})`:"")
 
-playerList.appendChild(div);
-
-}
-
-});
+playerList.appendChild(div)
 
 }
 
-
-// 破産画面
-
-function showBankrupt(data){
-
-game.style.display="none";
-bankrupt.style.display="block";
-
-bankruptName.textContent=currentName;
-
-bankruptPlayers.innerHTML="";
-
-for(let p in data.players){
-
-const div=document.createElement("div");
-
-if(data.eliminated[p]){
-
-div.textContent=p+" ☠ 破産しました";
-
-}else{
-
-const money=Math.floor(data.players[p]);
-const loan=data.loans[p]?.amount||0;
-const trust=data.trust[p]||0;
-
-div.textContent=
-p+" 💰"+money+" 💳"+loan+" ⭐"+trust;
+})
 
 }
 
-bankruptPlayers.appendChild(div);
-
-}
-
-}
-
-
-function spectate(){
-
-alert("観戦モード");
-
-}
-
-
-setInterval(loadState,1000);
+setInterval(loadState,1000)
 
 </script>
 
