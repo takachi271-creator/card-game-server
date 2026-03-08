@@ -289,23 +289,6 @@ res.json(game)
 })
 
 
-game.players[name]+=pot
-
-game.turnHistory.push({
-round:game.round,
-winner:name,
-amount:pot
-})
-
-if(game.turnHistory.length>50) game.turnHistory.shift()
-
-io.emit("turnEnd",{winner:name,amount:pot})
-
-game.bets={}
-game.folded={}
-
-game.round++
-
 for(let p in game.players){
 checkBankrupt(p)
 }
